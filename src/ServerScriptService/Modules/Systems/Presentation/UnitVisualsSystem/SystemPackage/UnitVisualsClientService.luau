@@ -1,6 +1,7 @@
 --!strict
 
 const RunService = game:GetService("RunService")
+const TweenService = game:GetService("TweenService")
 
 const GroundPlane = require("@game/ServerScriptService/Modules/Utilities/GroundPlane")
 const UnitClientService = require(
@@ -44,6 +45,22 @@ const METAL_COLOR = Color3.fromRGB(62, 68, 86)
 const EYE_COLOR = Color3.fromRGB(235, 250, 255)
 const BEAST_EYE_COLOR = Color3.fromRGB(255, 235, 170)
 const BLACK = Color3.new(0, 0, 0)
+const WHITE = Color3.new(1, 1, 1)
+-- Studs per second past which a figure is dashing and leaves afterimages.
+-- Walking tops out near 17.
+const AFTERIMAGE_SPEED = 28
+-- Seconds.
+const AFTERIMAGE_INTERVAL = 0.035
+const AFTERIMAGE_LIFETIME = 0.3
+const AFTERIMAGE_TRANSPARENCY = 0.55
+-- The cross a figure's melee hit leaves on its target.
+const SPARK_LENGTH = 2.4
+const SPARK_THICKNESS = 0.18
+const SPARK_LIFETIME = 0.18
+const SPARK_COLOR = Color3.fromRGB(255, 250, 220)
+-- The flash where a shot lands.
+const IMPACT_SIZE = 1.8
+const IMPACT_LIFETIME = 0.2
 
 const UnitTypes = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitTypes"
@@ -87,6 +104,7 @@ type Visual = {
 	Body: BasePart,
 	Parts: { BasePart },
 	Rig: CharacterRig.Rig?,
+	LastAfterimageTime: number,
 	-- Each part's transparency while the unit is alive, by index in Parts.
 	PartTransparencies: { number },
 	HasHealthBar: boolean,
@@ -522,6 +540,7 @@ local function addVisual(unit: ClientUnit)
 		Body = body,
 		Parts = parts,
 		Rig = rig,
+		LastAfterimageTime = 0,
 		PartTransparencies = partTransparencies,
 		HasHealthBar = hasHealthBar,
 		Rotation = rotation,
@@ -576,15 +595,91 @@ local function createShotPart(): BasePart
 	return part
 end
 
+--[[
+	Tweens a passing effect part toward goal, then destroys it.
+]]
+local function fadeAway(part: BasePart, lifetime: number, goal: { [string]: any })
+	local tween = TweenService:Create(
+		part,
+		TweenInfo.new(lifetime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		goal
+	)
+	tween.Completed:Once(function()
+		part:Destroy()
+	end)
+	tween:Play()
+end
+
+local function spawnAfterimage(rig: CharacterRig.Rig, color: Color3)
+	local visualFolder = folder
+	if not visualFolder then
+		return
+	end
+	for _, ghost in CharacterRig.snapshot(rig, color, AFTERIMAGE_TRANSPARENCY) do
+		ghost.Parent = visualFolder
+		fadeAway(ghost, AFTERIMAGE_LIFETIME, { Transparency = 1 })
+	end
+end
+
+--[[
+	A cross that flashes on the target of a figure's melee hit, turned to face
+	the camera so it reads from any angle.
+]]
+local function spawnSpark(position: Vector3)
+	local visualFolder = folder
+	local camera = workspace.CurrentCamera
+	if not visualFolder or not camera then
+		return
+	end
+	local facing = CFrame.lookAt(position, position - camera.CFrame.LookVector)
+	for _, roll in { math.pi / 4, -math.pi / 4 } do
+		local part = PartBuilder.create({
+			Shape = "Block",
+			Size = Vector3.new(SPARK_THICKNESS, SPARK_LENGTH * 0.4, SPARK_THICKNESS),
+			Offset = facing * CFrame.Angles(0, 0, roll),
+			Color = SPARK_COLOR,
+			Material = Enum.Material.Neon,
+		}, 0)
+		part.CanQuery = false
+		part.Parent = visualFolder
+		fadeAway(part, SPARK_LIFETIME, {
+			Size = Vector3.new(SPARK_THICKNESS * 0.3, SPARK_LENGTH, SPARK_THICKNESS * 0.3),
+			Transparency = 1,
+		})
+	end
+end
+
+local function spawnImpact(position: Vector3, color: Color3)
+	local visualFolder = folder
+	if not visualFolder then
+		return
+	end
+	local part = PartBuilder.create({
+		Shape = "Ball",
+		Size = Vector3.one * SHOT_SIZE,
+		Offset = CFrame.new(position),
+		Color = color:Lerp(WHITE, 0.4),
+		Material = Enum.Material.Neon,
+	}, 0)
+	part.CanQuery = false
+	part.Parent = visualFolder
+	fadeAway(part, IMPACT_LIFETIME, { Size = Vector3.one * IMPACT_SIZE, Transparency = 1 })
+end
+
 local function onAttackFired(attacker: ClientUnit, target: ClientUnit)
 	local visual = visuals[attacker.Id]
 	local rig = visual and visual.Rig
-	if rig then
-		CharacterRig.startAttack(rig, os.clock())
-	end
-
 	local spec = specs[attacker.TypeId]
 	local speed = spec and spec.ProjectileSpeed
+	if rig then
+		CharacterRig.startAttack(rig, os.clock())
+		if not speed then
+			local targetPosition =
+				UnitClientService:GetRenderPose(target, UnitClientService:GetRenderTime())
+			spawnSpark(targetPosition + Vector3.new(0, SHOT_HEIGHT, 0))
+		end
+	end
+
 	local visualFolder = folder
 	if not speed or not visualFolder then
 		return
@@ -620,6 +715,8 @@ local function stepShots(deltaTime: number, renderTime: number)
 				shot.Position += offset / distance * stepLength
 				shot.Part.CFrame = CFrame.new(shot.Position)
 				isFinished = false
+			else
+				spawnImpact(targetPosition + Vector3.new(0, SHOT_HEIGHT, 0), shot.Part.Color)
 			end
 		end
 
@@ -668,6 +765,13 @@ local function render(deltaTime: number)
 			local feet = CFrame.new(position.X, GROUND_CLEARANCE + bob, position.Z)
 				* CFrame.Angles(0, facing, 0)
 			CharacterRig.pose(rig, feet, deltaTime, now, movedParts, movedCFrames)
+			if
+				rig.Speed > AFTERIMAGE_SPEED
+				and now - visual.LastAfterimageTime >= AFTERIMAGE_INTERVAL
+			then
+				visual.LastAfterimageTime = now
+				spawnAfterimage(rig, teamColors[unit.Team]:Lerp(WHITE, 0.35))
+			end
 		end
 
 		local ratio = if unit.MaxHealth > 0
@@ -702,6 +806,18 @@ end
 
 function Module:RegisterVisual(typeId: string, spec: VisualSpec)
 	specs[typeId] = spec
+end
+
+--[[
+	Plays a motion on a unit drawn as a figure, such as a pose for an ability
+	it cast. Units drawn any other way ignore it.
+]]
+function Module:PlayMotion(unitId: number, motion: CharacterRig.Motion)
+	local visual = visuals[unitId]
+	local rig = visual and visual.Rig
+	if rig then
+		CharacterRig.play(rig, motion, os.clock())
+	end
 end
 
 function Module:SetTeamColor(team: Team, color: Color3)

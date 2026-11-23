@@ -14,6 +14,9 @@ const SEO_DAN_COLOR = Color3.fromRGB(150, 110, 255)
 -- Seconds the flash of a cast stays on the screen.
 const FLASH_DURATION = 0.4
 const SMALL_RING_RADIUS = 2.5
+-- Radians of the cleave's arc, and how far past the hit area it is drawn.
+const CLEAVE_ARC = 2.6
+const CLEAVE_REACH = 1.4
 const SOLDIER_TYPE_ID = "ShadowSoldier"
 const KNIGHT_TYPE_ID = "ShadowKnight"
 -- Soldiers keep pace with Seo Dan, whatever they were in life.
@@ -186,7 +189,15 @@ local function shadowSlash(context: CastContext): boolean
 	local values = context.Values
 	local center = seoDan.Position + context.Direction * values.Radius * 0.6
 	KitHelpers.damageAround(seoDan, center, values.Radius, values.Damage)
-	ring(center, values.Radius)
+	AbilityServerService:PlayEffect({
+		Kind = "Slash",
+		Position = seoDan.Position,
+		Direction = context.Direction,
+		Radius = values.Radius * CLEAVE_REACH,
+		Arc = CLEAVE_ARC,
+		Color = SEO_DAN_COLOR,
+		Duration = FLASH_DURATION,
+	})
 	return true
 end
 

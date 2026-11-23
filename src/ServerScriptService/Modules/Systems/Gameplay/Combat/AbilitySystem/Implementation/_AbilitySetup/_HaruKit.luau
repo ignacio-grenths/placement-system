@@ -13,6 +13,10 @@ const HARU_COLOR = Color3.fromRGB(255, 150, 40)
 const FLASH_DURATION = 0.4
 const SMALL_RING_RADIUS = 2.5
 const BEAM_WIDTH = 0.6
+-- Radians of a clone's strike, and between strikes' angles, so each storm
+-- strike crosses the last from somewhere new.
+const STRIKE_ARC = 2.2
+const STRIKE_TURN = 2.1
 
 const AbilityTypes = require("../../SystemPackage/AbilityTypes")
 const UnitTypes = require(
@@ -50,6 +54,18 @@ local function ring(position: Vector3, radius: number)
 		Kind = "Ring",
 		Position = position,
 		Radius = radius,
+		Color = HARU_COLOR,
+		Duration = FLASH_DURATION,
+	})
+end
+
+local function slash(position: Vector3, direction: Vector3, radius: number, arc: number)
+	AbilityServerService:PlayEffect({
+		Kind = "Slash",
+		Position = position,
+		Direction = direction,
+		Radius = radius,
+		Arc = arc,
 		Color = HARU_COLOR,
 		Duration = FLASH_DURATION,
 	})
@@ -108,6 +124,7 @@ local function spiralStrike(context: CastContext): boolean
 	UnitServerService:Dash(context.Caster, context.AimPoint, values.DashSpeed, function(haru)
 		KitHelpers.damageAround(haru, haru.Position, values.Radius, values.Damage)
 		ring(haru.Position, values.Radius)
+		slash(haru.Position, context.Direction, values.Radius, math.pi * 2)
 	end)
 	return true
 end
@@ -141,7 +158,9 @@ local function echoStorm(context: CastContext): boolean
 				return
 			end
 			UnitServerService:ApplyDamage(target, values.StrikeDamage, haru, "Ability")
-			ring(target.Position, values.RingRadius)
+			local angle = strike * STRIKE_TURN
+			local direction = Vector3.new(math.sin(angle), 0, math.cos(angle))
+			slash(target.Position, direction, values.RingRadius, STRIKE_ARC)
 		end)
 	end
 	return true

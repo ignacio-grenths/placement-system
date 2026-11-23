@@ -94,5 +94,24 @@ export type Effect =
 		Color: Color3,
 		Duration: number,
 	}
+	-- A blade's arc swept around Position, centered on Direction.
+	| {
+		Kind: "Slash",
+		Position: Vector3,
+		-- Flat and of length 1.
+		Direction: Vector3,
+		Radius: number,
+		-- Radians the arc spans. Two pi sweeps all the way around.
+		Arc: number,
+		Color: Color3,
+		Duration: number,
+	}
+	-- A unit just cast an ability, so clients can show it casting.
+	| {
+		Kind: "Cast",
+		CasterId: number,
+		AbilityId: string,
+		Position: Vector3,
+	}
 
 return {}

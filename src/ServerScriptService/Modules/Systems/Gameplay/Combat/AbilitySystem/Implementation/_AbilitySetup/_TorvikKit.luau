@@ -14,6 +14,9 @@ const FLASH_DURATION = 0.4
 const SMALL_RING_RADIUS = 2.5
 const CAST_RING_RADIUS = 3
 const BEAM_WIDTH = 0.6
+const SLASH_RADIUS = 2.8
+-- Radians.
+const SLASH_ARC = 2.4
 
 const AbilityTypes = require("../../SystemPackage/AbilityTypes")
 const UnitTypes = require(
@@ -32,6 +35,23 @@ local function ring(position: Vector3, radius: number, duration: number?)
 		Radius = radius,
 		Color = TORVIK_COLOR,
 		Duration = duration or FLASH_DURATION,
+	})
+end
+
+--[[
+	A blade's arc across the target, swung from where Torvik stands.
+]]
+local function slashAcross(torvik: Unit, target: Unit)
+	local offset = target.Position - torvik.Position
+	local flat = Vector3.new(offset.X, 0, offset.Z)
+	AbilityServerService:PlayEffect({
+		Kind = "Slash",
+		Position = target.Position,
+		Direction = if flat.Magnitude > 0.01 then flat.Unit else Vector3.zAxis,
+		Radius = SLASH_RADIUS,
+		Arc = SLASH_ARC,
+		Color = TORVIK_COLOR,
+		Duration = FLASH_DURATION,
 	})
 end
 
@@ -65,7 +85,7 @@ local function twinFangs(context: CastContext): boolean
 		end
 		hitsLeft -= 1
 		UnitServerService:ApplyDamage(target, values.BonusDamage, torvik, "Ability")
-		ring(target.Position, SMALL_RING_RADIUS)
+		slashAcross(torvik, target)
 		if hitsLeft == 0 then
 			slow(target, "Torvik.TwinFangs.Slow", values.SlowMultiplier, values.SlowSeconds)
 			finish()
@@ -113,6 +133,7 @@ local function parry(context: CastContext): boolean
 			Color = TORVIK_COLOR,
 			Duration = FLASH_DURATION,
 		})
+		slashAcross(torvik, source)
 	end)
 	SimClock.delay(values.Window, finish)
 	ring(torvik.Position, SMALL_RING_RADIUS, values.Window)
@@ -138,6 +159,7 @@ local function leapStrike(context: CastContext): boolean
 		UnitServerService:ApplyDamage(target, values.Damage, unit, "Ability")
 		slow(target, "Torvik.LeapStrike.Slow", values.SlowMultiplier, values.SlowSeconds)
 		ring(target.Position, SMALL_RING_RADIUS)
+		slashAcross(unit, target)
 		UnitServerService:IssueOrder(unit, { Kind = "Attack", TargetId = target.Id })
 	end)
 	return true

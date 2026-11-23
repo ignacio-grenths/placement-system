@@ -37,13 +37,15 @@ const MOVE_BLEND_RATE = 10
 -- Studs in one frame, at scale 1, past which the unit was moved there, as by
 -- a blink, rather than walked.
 const MAX_STEP = 4
--- Seconds.
-const ATTACK_DURATION = 0.4
+const GHOST_MATERIAL = Enum.Material.Neon
 
 export type RigBone = "Torso" | "Head" | "LeftArm" | "RightArm" | "LeftLeg" | "RightLeg"
 -- Slash swings overhead and DualSlash alternates hands. Shoot points at the
 -- target.
 export type AttackMotion = "Slash" | "DualSlash" | "Punch" | "Shoot"
+-- Attacks, plus two-armed casting poses: Raise lifts both arms overhead,
+-- Slam brings them down from there, and Blast thrusts both forward.
+export type Motion = AttackMotion | "Raise" | "Slam" | "Blast"
 
 export type RigSpec = {
 	-- 1 is a figure about 5 studs tall.
@@ -72,16 +74,20 @@ export type Rig = {
 	-- The bones and everything attached to them.
 	Parts: { BasePart },
 	Scale: number,
-	Motion: AttackMotion,
+	AttackMotion: AttackMotion,
 	-- Scaled joint positions and bone centers, by index in Bones.
 	Joints: { Vector3 },
 	Centers: { CFrame },
 	StridePhase: number,
 	-- 0 standing still to 1 at a full stride.
 	MoveBlend: number,
+	-- Studs per second over the last pose.
+	Speed: number,
 	LastPosition: Vector3?,
-	AttackStartTime: number?,
-	AttackCount: number,
+	ActiveMotion: Motion?,
+	MotionStartTime: number,
+	-- Counts motions played, so DualSlash can alternate hands.
+	MotionCount: number,
 }
 
 type BoneLayout = {
@@ -95,14 +101,24 @@ type BoneLayout = {
 	IsWidened: boolean,
 }
 
--- How the attacking arm and the torso move at one moment of an attack.
+-- How the moving arm and the torso sit at one moment of a motion.
 type ArmPose = {
 	-- Radians forward, from hanging down.
 	Swing: number,
 	-- Radians out to the side.
 	Spread: number,
-	-- Radians the torso turns toward the attacking side's opposite.
+	-- Radians the torso turns toward the moving arm's opposite side.
 	Twist: number,
+}
+
+-- Poses at moments from 0 to 1 through the motion, eased between.
+type Timeline = {
+	-- Seconds.
+	Duration: number,
+	-- Both arms take each pose, mirrored, instead of the attacking arm alone.
+	IsTwoArmed: boolean,
+	Moments: { number },
+	Poses: { ArmPose },
 }
 
 -- Bones are posed in this order, so the torso is placed before the bones
@@ -166,9 +182,11 @@ const RIGHT_LEG_INDEX = 6
 
 const REST: ArmPose = { Swing = 0, Spread = IDLE_ARM_SPREAD, Twist = 0 }
 
--- Each attack winds up, strikes, and settles back to rest.
-const ATTACK_TIMELINES: { [AttackMotion]: { Moments: { number }, Poses: { ArmPose } } } = {
+-- Each motion winds up, strikes or holds, and settles back to rest.
+const TIMELINES: { [Motion]: Timeline } = {
 	Slash = {
+		Duration = 0.4,
+		IsTwoArmed = false,
 		Moments = { 0, 0.35, 0.6, 1 },
 		Poses = {
 			REST,
@@ -178,6 +196,8 @@ const ATTACK_TIMELINES: { [AttackMotion]: { Moments: { number }, Poses: { ArmPos
 		},
 	},
 	DualSlash = {
+		Duration = 0.4,
+		IsTwoArmed = false,
 		Moments = { 0, 0.3, 0.55, 1 },
 		Poses = {
 			REST,
@@ -187,6 +207,8 @@ const ATTACK_TIMELINES: { [AttackMotion]: { Moments: { number }, Poses: { ArmPos
 		},
 	},
 	Punch = {
+		Duration = 0.4,
+		IsTwoArmed = false,
 		Moments = { 0, 0.25, 0.5, 1 },
 		Poses = {
 			REST,
@@ -196,12 +218,47 @@ const ATTACK_TIMELINES: { [AttackMotion]: { Moments: { number }, Poses: { ArmPos
 		},
 	},
 	Shoot = {
+		Duration = 0.4,
+		IsTwoArmed = false,
 		Moments = { 0, 0.15, 0.3, 0.65, 1 },
 		Poses = {
 			REST,
 			{ Swing = 1.6, Spread = 0, Twist = 0.2 },
 			{ Swing = 1.35, Spread = 0, Twist = 0.25 },
 			{ Swing = 1.6, Spread = 0, Twist = 0.2 },
+			REST,
+		},
+	},
+	Raise = {
+		Duration = 0.6,
+		IsTwoArmed = true,
+		Moments = { 0, 0.25, 0.75, 1 },
+		Poses = {
+			REST,
+			{ Swing = 2.9, Spread = 0.4, Twist = 0 },
+			{ Swing = 2.9, Spread = 0.4, Twist = 0 },
+			REST,
+		},
+	},
+	Slam = {
+		Duration = 0.5,
+		IsTwoArmed = true,
+		Moments = { 0, 0.35, 0.55, 1 },
+		Poses = {
+			REST,
+			{ Swing = 2.8, Spread = 0.25, Twist = 0 },
+			{ Swing = 0.6, Spread = 0.15, Twist = 0 },
+			REST,
+		},
+	},
+	Blast = {
+		Duration = 0.6,
+		IsTwoArmed = true,
+		Moments = { 0, 0.2, 0.8, 1 },
+		Poses = {
+			REST,
+			{ Swing = 1.55, Spread = -0.15, Twist = 0 },
+			{ Swing = 1.55, Spread = -0.15, Twist = 0 },
 			REST,
 		},
 	},
@@ -388,20 +445,57 @@ function Module.build(spec: RigSpec, transparency: number, sizeScale: number): R
 		Bones = bones,
 		Parts = parts,
 		Scale = scale,
-		Motion = spec.AttackMotion,
+		AttackMotion = spec.AttackMotion,
 		Joints = joints,
 		Centers = centers,
 		StridePhase = 0,
 		MoveBlend = 0,
+		Speed = 0,
 		LastPosition = nil,
-		AttackStartTime = nil,
-		AttackCount = 0,
+		ActiveMotion = nil,
+		MotionStartTime = 0,
+		MotionCount = 0,
 	}
 end
 
+--[[
+	Starts a motion, cutting short any motion still playing.
+]]
+function Module.play(rig: Rig, motion: Motion, now: number)
+	rig.ActiveMotion = motion
+	rig.MotionStartTime = now
+	rig.MotionCount += 1
+end
+
 function Module.startAttack(rig: Rig, now: number)
-	rig.AttackStartTime = now
-	rig.AttackCount += 1
+	Module.play(rig, rig.AttackMotion, now)
+end
+
+--[[
+	Copies the figure's bones as glowing, featureless parts where they stand
+	now, for an afterimage. The caller parents, fades, and destroys them.
+]]
+function Module.snapshot(rig: Rig, color: Color3, transparency: number): { BasePart }
+	local ghosts: { BasePart } = {}
+	for _, bone in rig.Bones do
+		local ghost = Instance.new("Part")
+		ghost.Anchored = true
+		ghost.CanCollide = false
+		ghost.CanQuery = false
+		ghost.CanTouch = false
+		ghost.CastShadow = false
+		ghost.Material = GHOST_MATERIAL
+		ghost.Color = color
+		ghost.Transparency = transparency
+		ghost.Size = bone.Size
+		ghost.CFrame = bone.CFrame
+		local mesh = bone:FindFirstChildOfClass("SpecialMesh")
+		if mesh then
+			mesh:Clone().Parent = ghost
+		end
+		table.insert(ghosts, ghost)
+	end
+	return ghosts
 end
 
 --[[
@@ -429,6 +523,7 @@ function Module.pose(
 	end
 
 	local speed = if deltaTime > 0 then moved / deltaTime else 0
+	rig.Speed = speed
 	local targetBlend = math.clamp(speed / (FULL_STRIDE_SPEED * scale), 0, 1)
 	rig.MoveBlend += (targetBlend - rig.MoveBlend) * math.min(1, deltaTime * MOVE_BLEND_RATE)
 	rig.StridePhase = (rig.StridePhase + moved / (STRIDE_LENGTH * scale) * 2 * math.pi)
@@ -436,18 +531,21 @@ function Module.pose(
 	local blend = rig.MoveBlend
 	local stride = math.sin(rig.StridePhase)
 
-	local attack: ArmPose? = nil
-	local attackStartTime = rig.AttackStartTime
-	if attackStartTime then
-		local progress = (now - attackStartTime) / ATTACK_DURATION
+	local armPose: ArmPose? = nil
+	local isTwoArmed = false
+	local activeMotion = rig.ActiveMotion
+	if activeMotion then
+		-- Cast because luau-lsp widens the narrowed motion to string.
+		local timeline = TIMELINES[activeMotion :: Motion]
+		local progress = (now - rig.MotionStartTime) / timeline.Duration
 		if progress >= 1 then
-			rig.AttackStartTime = nil
+			rig.ActiveMotion = nil
 		else
-			local timeline = ATTACK_TIMELINES[rig.Motion]
-			attack = blendPoses(timeline.Moments, timeline.Poses, progress)
+			armPose = blendPoses(timeline.Moments, timeline.Poses, progress)
+			isTwoArmed = timeline.IsTwoArmed
 		end
 	end
-	local isLeftAttack = rig.Motion == "DualSlash" and rig.AttackCount % 2 == 0
+	local isLeftArm = activeMotion == "DualSlash" and rig.MotionCount % 2 == 0
 
 	local breath = math.sin(now * BREATH_SPEED)
 	local bounce = math.abs(math.cos(rig.StridePhase)) * STRIDE_BOUNCE * blend * scale
@@ -458,14 +556,15 @@ function Module.pose(
 	local leftSpread = IDLE_ARM_SPREAD
 	local rightSpread = IDLE_ARM_SPREAD
 	local twist = 0
-	if attack and isLeftAttack then
-		leftSwing = attack.Swing
-		leftSpread = attack.Spread
-		twist = -attack.Twist
-	elseif attack then
-		rightSwing = attack.Swing
-		rightSpread = attack.Spread
-		twist = attack.Twist
+	if armPose and (isTwoArmed or isLeftArm) then
+		leftSwing = armPose.Swing
+		leftSpread = armPose.Spread
+		twist = -armPose.Twist
+	end
+	if armPose and (isTwoArmed or not isLeftArm) then
+		rightSwing = armPose.Swing
+		rightSpread = armPose.Spread
+		twist = armPose.Twist
 	end
 
 	local joints = rig.Joints

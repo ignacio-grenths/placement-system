@@ -514,6 +514,12 @@ function Module:Cast(unit: Unit, slot: Slot, aim: Aim?): (boolean, string?)
 		end
 	end
 	Module.AbilityCast:Fire(unit, slot, cooldown)
+	Module:PlayEffect({
+		Kind = "Cast",
+		CasterId = unit.Id,
+		AbilityId = ability.Info.Id,
+		Position = unit.Position,
+	})
 	return true, nil
 end
 
@@ -605,10 +611,10 @@ local function getEffectPoints(effect: Effect): { Vector3 }
 	if effect.Kind == "Projectile" then
 		local reach = effect.Direction.Unit * effect.Range
 		return { effect.Origin, effect.Origin + reach / 2, effect.Origin + reach }
-	elseif effect.Kind == "Ring" then
-		return { effect.Position }
-	else
+	elseif effect.Kind == "Beam" then
 		return { effect.From, effect.To }
+	else
+		return { effect.Position }
 	end
 end
 
