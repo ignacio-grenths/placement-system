@@ -100,7 +100,8 @@ type Visual = {
 	HealthBar: BillboardGui,
 	HealthFill: Frame,
 	ShownHealth: number,
-	IsShownDead: boolean,
+	-- Dead or out of sight, and so drawn invisible.
+	IsShownGone: boolean,
 	IsShownTargetable: boolean,
 	IsShownEnlarged: boolean,
 }
@@ -613,7 +614,7 @@ local function addVisual(unit: ClientUnit)
 		HealthBar = healthBar,
 		HealthFill = healthFill,
 		ShownHealth = 1,
-		IsShownDead = false,
+		IsShownGone = false,
 		IsShownTargetable = true,
 		IsShownEnlarged = unit.IsEnlarged,
 	}
@@ -629,12 +630,19 @@ local function removeVisual(unit: ClientUnit)
 	visual.Body:Destroy()
 end
 
-local function showDead(visual: Visual, isDead: boolean)
-	visual.IsShownDead = isDead
+--[[
+	Hides or shows a unit that is dead or out of sight.
+]]
+local function showGone(visual: Visual, isGone: boolean)
+	visual.IsShownGone = isGone
 	for index, part in visual.Parts do
-		part.Transparency = if isDead then 1 else visual.PartTransparencies[index]
+		part.Transparency = if isGone then 1 else visual.PartTransparencies[index]
 	end
-	visual.HealthBar.Enabled = visual.HasHealthBar and not isDead
+	visual.HealthBar.Enabled = visual.HasHealthBar and not isGone
+end
+
+local function isGone(unit: ClientUnit): boolean
+	return unit.IsDead or unit.IsHidden
 end
 
 local function createShotPart(): BasePart
@@ -679,7 +687,7 @@ local function stepShots(deltaTime: number, renderTime: number)
 		local target = UnitClientService:GetUnit(shot.TargetId)
 		local isFinished = true
 
-		if target and not target.IsDead then
+		if target and not isGone(target) then
 			local targetPosition = UnitClientService:GetRenderPose(target, renderTime)
 			local offset = targetPosition + Vector3.new(0, SHOT_HEIGHT, 0) - shot.Position
 			local distance = offset.Magnitude
@@ -712,10 +720,11 @@ local function render(deltaTime: number)
 			continue
 		end
 		local unit = visual.Unit
-		if unit.IsDead ~= visual.IsShownDead then
-			showDead(visual, unit.IsDead)
+		local isUnitGone = isGone(unit)
+		if isUnitGone ~= visual.IsShownGone then
+			showGone(visual, isUnitGone)
 		end
-		if unit.IsDead then
+		if isUnitGone then
 			continue
 		end
 
@@ -786,7 +795,7 @@ function Module:PickUnit(ray: Ray): ClientUnit?
 	if result then
 		local unitId = result.Instance:GetAttribute("UnitId")
 		local unit = if typeof(unitId) == "number" then UnitClientService:GetUnit(unitId) else nil
-		if unit and not unit.IsDead then
+		if unit and not isGone(unit) then
 			return unit
 		end
 	end
@@ -800,7 +809,7 @@ function Module:PickUnit(ray: Ray): ClientUnit?
 	local nearest: ClientUnit? = nil
 	local nearestDistance = math.huge
 	for _, unit in UnitClientService:GetUnits() do
-		if not unit or unit.IsDead then
+		if not unit or isGone(unit) then
 			continue
 		end
 		local position = UnitClientService:GetRenderPose(unit, renderTime)

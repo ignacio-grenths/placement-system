@@ -184,7 +184,8 @@ Module.PairBonuses = {
 	},
 	BountyHunter = {
 		Name = "Bounty Hunter",
-		Description = "Hero takedowns pay 50% more gold.",
+		Description = "Hero takedowns pay 50% more gold, and enemy heroes below 30% "
+			.. "health near you are revealed.",
 		Items = { "BountyScope", "TrackersCloak" },
 		Order = 2,
 	},
@@ -224,6 +225,10 @@ Module.Effects = {
 	WreckingSeconds = 4,
 	WreckingShare = 0.5,
 	BountyGoldMultiplier = 1.5,
+	-- Bounty Hunter: studs within which a hurt enemy hero is revealed, and
+	-- the share of max health it counts as hurt below.
+	BountyRevealRadius = 60,
+	BountyRevealHealthShare = 0.3,
 	LastStandThreshold = 0.3,
 	LastStandCooldown = 20,
 	-- Spellstrike: seconds the empowered attack waits after a cast, its

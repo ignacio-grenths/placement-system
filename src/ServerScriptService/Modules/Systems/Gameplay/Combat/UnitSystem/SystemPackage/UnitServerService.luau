@@ -70,6 +70,15 @@ export type RootOptions = {
 	IsSelfApplied: boolean?,
 }
 
+-- Who sees what, for fog of war. A team always sees its own units.
+export type Visibility = {
+	IsUnitVisible: (unit: Unit, team: Team) -> boolean,
+	IsPointVisible: (position: Vector3, team: Team) -> boolean,
+	-- The team whose sight a player shares, or nil for a player who sees
+	-- everything, such as a spectator.
+	GetViewerTeam: (player: Player) -> Team?,
+}
+
 type Projectile = {
 	SourceId: number,
 	TargetId: number,
@@ -93,6 +102,8 @@ type SentState = {
 }
 
 const IDLE_ORDER: Order = { Kind = "Idle" }
+-- The snapshot stream of players who see every unit.
+const OPEN_STREAM = "All"
 
 local Module = {}
 
@@ -108,7 +119,8 @@ local random = Random.new()
 local unitsById: { [number]: Unit? } = {}
 local unitArray: { Unit } = {}
 local projectiles: { Projectile } = {}
-local sentStates: { [number]: SentState? } = {}
+-- What each snapshot stream (a team, or OPEN_STREAM) last got, by unit id.
+local sentStates: { [string]: { [number]: SentState? } } = {}
 local lastSyncTimes: { [Player]: number? } = {}
 local pendingAdded: { UnitInfo } = {}
 local pendingRemoved: { number } = {}
@@ -119,6 +131,7 @@ local snapshotTimer = 0
 local separationTimer = 0
 local navigation: Navigation.Navigation? = nil
 local shieldModifier: ((Unit, number, Unit?) -> number)? = nil
+local visibility: Visibility? = nil
 
 local function flatten(position: Vector3): Vector3
 	return Vector3.new(position.X, 0, position.Z)
@@ -276,9 +289,25 @@ local function killUnit(unit: Unit, killer: Unit?)
 	end
 end
 
+local function sendAttackFired(unit: Unit, target: Unit)
+	local current = visibility
+	if not current then
+		UnitNetwork.AttackFired:FireAllClients(unit.Id, target.Id)
+		return
+	end
+	-- An attack from out of sight would show where its attacker hides.
+	for _, player in Players:GetPlayers() do
+		-- Annotated because luau-lsp widens the narrowed team to string.
+		local team: Team? = current.GetViewerTeam(player)
+		if not team or Module:IsVisibleTo(unit, team) then
+			UnitNetwork.AttackFired:FireClient(player, unit.Id, target.Id)
+		end
+	end
+end
+
 local function performAttack(unit: Unit, target: Unit)
 	unit.AttackCooldown = unit.Stats.AttackInterval
-	UnitNetwork.AttackFired:FireAllClients(unit.Id, target.Id)
+	sendAttackFired(unit, target)
 
 	local damage = CombatRules.rollAttackDamage(
 		unit.Stats.AttackDamage,
@@ -491,49 +520,137 @@ local function isSameState(sent: SentState, current: SentState): boolean
 		and sent.Epoch == current.Epoch
 end
 
-local function sendSnapshots(now: number)
+local function getVisibleState(unit: Unit, now: number): SentState
+	return {
+		X = UnitSnapshotCodec.quantizePosition(unit.Position.X),
+		Z = UnitSnapshotCodec.quantizePosition(unit.Position.Z),
+		Facing = UnitSnapshotCodec.quantizeFacing(unit.Facing),
+		Flags = getFlags(unit, now),
+		Health = UnitSnapshotCodec.quantizeAmount(unit.Health),
+		MaxHealth = UnitSnapshotCodec.quantizeAmount(unit.Stats.MaxHealth),
+		Resource = UnitSnapshotCodec.quantizeAmount(unit.Resource),
+		MaxResource = UnitSnapshotCodec.quantizeAmount(unit.MaxResource),
+		Shield = UnitSnapshotCodec.quantizeAmount(unit.Shield),
+		Epoch = unit.MoveEpoch,
+		Time = now,
+	}
+end
+
+-- A hidden unit's entry carries nothing but the flag, so it gives away
+-- neither where the unit is nor how it is doing.
+local function getHiddenState(now: number): SentState
+	return {
+		X = 0,
+		Z = 0,
+		Facing = 0,
+		Flags = UnitSnapshotCodec.Flags.Hidden,
+		Health = 0,
+		MaxHealth = 0,
+		Resource = 0,
+		MaxResource = 0,
+		Shield = 0,
+		Epoch = 0,
+		Time = now,
+	}
+end
+
+--[[
+	Returns the entries a stream needs: every unit whose state changed since
+	the stream last got it, or that it has not had for a while. Units team
+	can't see go out hidden; a nil team sees every unit.
+]]
+local function buildEntries(stream: string, team: Team?, now: number): { UnitSnapshotCodec.Entry }
+	local sent = sentStates[stream]
+	if not sent then
+		sent = {}
+		sentStates[stream] = sent
+	end
+
 	local entries: { UnitSnapshotCodec.Entry } = {}
 	for _, unit in unitArray do
 		if unit.IsRemoved then
 			continue
 		end
 
-		local state: SentState = {
-			X = UnitSnapshotCodec.quantizePosition(unit.Position.X),
-			Z = UnitSnapshotCodec.quantizePosition(unit.Position.Z),
-			Facing = UnitSnapshotCodec.quantizeFacing(unit.Facing),
-			Flags = getFlags(unit, now),
-			Health = UnitSnapshotCodec.quantizeAmount(unit.Health),
-			MaxHealth = UnitSnapshotCodec.quantizeAmount(unit.Stats.MaxHealth),
-			Resource = UnitSnapshotCodec.quantizeAmount(unit.Resource),
-			MaxResource = UnitSnapshotCodec.quantizeAmount(unit.MaxResource),
-			Shield = UnitSnapshotCodec.quantizeAmount(unit.Shield),
-			Epoch = unit.MoveEpoch,
-			Time = now,
-		}
-		local sent = sentStates[unit.Id]
-		if sent and now - sent.Time < REFRESH_INTERVAL and isSameState(sent, state) then
+		local isHidden = team ~= nil and not Module:IsVisibleTo(unit, team)
+		local state = if isHidden then getHiddenState(now) else getVisibleState(unit, now)
+		local previous = sent[unit.Id]
+		if previous and now - previous.Time < REFRESH_INTERVAL and isSameState(previous, state) then
 			continue
 		end
 
-		sentStates[unit.Id] = state
-		table.insert(entries, {
-			Id = unit.Id,
-			X = unit.Position.X,
-			Z = unit.Position.Z,
-			Facing = unit.Facing,
-			Flags = state.Flags,
-			Health = unit.Health,
-			MaxHealth = unit.Stats.MaxHealth,
-			Resource = unit.Resource,
-			MaxResource = unit.MaxResource,
-			Shield = unit.Shield,
-			Epoch = unit.MoveEpoch,
-		})
+		sent[unit.Id] = state
+		if isHidden then
+			table.insert(entries, {
+				Id = unit.Id,
+				X = 0,
+				Z = 0,
+				Facing = 0,
+				Flags = state.Flags,
+				Health = 0,
+				MaxHealth = 0,
+				Resource = 0,
+				MaxResource = 0,
+				Shield = 0,
+				Epoch = 0,
+			})
+		else
+			table.insert(entries, {
+				Id = unit.Id,
+				X = unit.Position.X,
+				Z = unit.Position.Z,
+				Facing = unit.Facing,
+				Flags = state.Flags,
+				Health = unit.Health,
+				MaxHealth = unit.Stats.MaxHealth,
+				Resource = unit.Resource,
+				MaxResource = unit.MaxResource,
+				Shield = unit.Shield,
+				Epoch = unit.MoveEpoch,
+			})
+		end
+	end
+	return entries
+end
+
+--[[
+	Groups players by the team whose sight they share. Players who see every
+	unit share OPEN_STREAM.
+]]
+local function getStreams(current: Visibility): { [string]: { Player } }
+	local streams: { [string]: { Player } } = {}
+	for _, player in Players:GetPlayers() do
+		local team = current.GetViewerTeam(player)
+		local stream = team or OPEN_STREAM
+		local players = streams[stream]
+		if players then
+			table.insert(players, player)
+		else
+			streams[stream] = { player }
+		end
+	end
+	return streams
+end
+
+local function sendSnapshots(now: number)
+	local serverTime = workspace:GetServerTimeNow()
+	local current = visibility
+	if not current then
+		local entries = buildEntries(OPEN_STREAM, nil, now)
+		for _, payload in UnitSnapshotCodec.encode(serverTime, entries) do
+			UnitNetwork.Snapshot:FireAllClients(payload)
+		end
+		return
 	end
 
-	for _, payload in UnitSnapshotCodec.encode(workspace:GetServerTimeNow(), entries) do
-		UnitNetwork.Snapshot:FireAllClients(payload)
+	for stream, players in getStreams(current) do
+		local team: Team? = if stream == OPEN_STREAM then nil else stream :: Team
+		local entries = buildEntries(stream, team, now)
+		for _, payload in UnitSnapshotCodec.encode(serverTime, entries) do
+			for _, player in players do
+				UnitNetwork.Snapshot:FireClient(player, payload)
+			end
+		end
 	end
 end
 
@@ -710,7 +827,9 @@ function Module:RemoveUnit(unit: Unit)
 
 	unit.IsRemoved = true
 	unitsById[unit.Id] = nil
-	sentStates[unit.Id] = nil
+	for _, sent in sentStates do
+		sent[unit.Id] = nil
+	end
 	hasRemovals = true
 
 	-- A unit removed in the step it spawned was never announced, so clients
@@ -805,6 +924,37 @@ function Module:CanAttack(attacker: Unit, target: Unit): boolean
 		and target.IsTargetable
 		and attacker.Team ~= target.Team
 		and attacker.Stats.AttackDamage > 0
+		and Module:IsVisibleTo(target, attacker.Team)
+end
+
+--[[
+	Whether a team can see the unit. Without fog of war every unit is seen.
+]]
+function Module:IsVisibleTo(unit: Unit, team: Team): boolean
+	local current = visibility
+	return current == nil or unit.Team == team or current.IsUnitVisible(unit, team)
+end
+
+function Module:IsPointVisibleTo(position: Vector3, team: Team): boolean
+	local current = visibility
+	return current == nil or current.IsPointVisible(position, team)
+end
+
+--[[
+	Returns the team whose sight the player shares, or nil when the player
+	sees everything.
+]]
+function Module:GetViewerTeam(player: Player): Team?
+	local current = visibility
+	return if current then current.GetViewerTeam(player) else nil
+end
+
+--[[
+	Turns on fog of war: units out of a team's sight are left out of that
+	team's snapshots and can't be attacked by it. Nil turns it off.
+]]
+function Module:SetVisibility(newVisibility: Visibility?)
+	visibility = newVisibility
 end
 
 function Module:IsStunned(unit: Unit): boolean

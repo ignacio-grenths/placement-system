@@ -47,6 +47,7 @@ local function findTarget(
 		if
 			not unit
 			or unit.IsDead
+			or unit.IsHidden
 			or not unit.IsTargetable
 			or not AbilityRules.matchesFilter(hero.Team, unit.Team, unit.Kind, filter)
 		then

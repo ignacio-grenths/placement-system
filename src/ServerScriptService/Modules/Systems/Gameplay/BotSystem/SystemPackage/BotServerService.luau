@@ -93,11 +93,13 @@ local function getHealthShare(unit: Unit): number
 	return unit.Health / math.max(unit.Stats.MaxHealth, 1)
 end
 
+-- Bots play by the fog of war: an enemy out of their team's sight is ignored.
 local function isLivingEnemy(bot: Unit, other: Unit): boolean
 	return other.Team ~= bot.Team
 		and not other.IsDead
 		and not other.IsRemoved
 		and other.IsTargetable
+		and UnitServerService:IsVisibleTo(other, bot.Team)
 end
 
 local function getReach(attacker: Unit, target: Unit): number

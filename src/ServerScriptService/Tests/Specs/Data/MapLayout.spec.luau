@@ -26,7 +26,12 @@ const CAMP_ROOM: { [MapLayout.CampKind]: number } = {
 }
 -- The widest hero's radius, plus a little room.
 const HERO_CLEARANCE = 2.5
+-- Studs a brush patch's edge keeps from lanes, the river, and walls, and
+-- from towers, whose shots can't reach into it.
+const BRUSH_EDGE_GAP = 2
+const BRUSH_STRUCTURE_GAP = 30
 
+-- Walls and brush patches share one shape: a thick line with round ends.
 type WallSpot = MapLayout.WallSpot
 
 local function closestOnSegment(point: Vector3, from: Vector3, to: Vector3): Vector3
@@ -104,6 +109,44 @@ describe("MapLayout", function()
 						break
 					end
 				end
+			end
+		end
+
+		expect(offenders).toEqual({})
+	end)
+
+	it("keeps every brush patch beside the lanes and clear of camps and towers", function()
+		local offenders = {}
+		local function check(index: number, feature: string, gap: number, required: number)
+			if gap < required then
+				table.insert(offenders, `brush {index} is {gap} studs from {feature}`)
+			end
+		end
+
+		for index, brush in MapLayout.Brushes do
+			for team, routes in MapLayout.Routes do
+				for laneName, route in routes do
+					local gap = getPathGap(brush, route) - MapLayout.LaneWidth / 2
+					check(index, `{team} {laneName} lane`, gap, BRUSH_EDGE_GAP)
+				end
+			end
+			local riverGap = getPathGap(brush, MapLayout.River) - MapLayout.RiverWidth / 2
+			check(index, "the river", riverGap, BRUSH_EDGE_GAP)
+			for wallIndex, wall in MapLayout.Walls do
+				local gap = getPathGap(brush, { wall.From, wall.To }) - wall.Radius
+				check(index, `wall {wallIndex}`, gap, BRUSH_EDGE_GAP)
+			end
+			for _, camp in MapLayout.Camps do
+				local gap = getPointGap(brush, camp.Position)
+				check(index, `camp {camp.Key}`, gap, CAMP_ROOM[camp.Kind])
+			end
+			for _, spot in MapLayout.Structures do
+				local name = `{spot.Team} {spot.Id}`
+				check(index, name, getPointGap(brush, spot.Position), BRUSH_STRUCTURE_GAP)
+			end
+			for _, pad in MapLayout.LaunchPads do
+				check(index, `{pad.Team} launch pad`, getPointGap(brush, pad.Position), PAD_GAP)
+				check(index, `{pad.Team} landing`, getPointGap(brush, pad.Landing), PAD_GAP)
 			end
 		end
 

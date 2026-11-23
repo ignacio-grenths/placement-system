@@ -51,6 +51,15 @@ export type WallSpot = {
 	Radius: number,
 }
 
+-- A patch of brush: tall alien plants that hide anyone inside from enemies
+-- outside it. Shaped like a wall, but units walk through it.
+export type BrushSpot = {
+	From: Vector3,
+	To: Vector3,
+	-- Studs from the patch's center line to its edge.
+	Radius: number,
+}
+
 export type LaunchPad = {
 	Team: MapTeam,
 	Position: Vector3,
@@ -133,6 +142,21 @@ const BLUE_WALLS: { WallSpot } = {
 	{ From = at(270, 300), To = at(282, 312), Radius = WALL_RADIUS },
 }
 
+const BRUSH_RADIUS = 5
+
+-- Blue's half of the brush: one beside each lane, two flanking mid, two on
+-- the river bank by the bosses, and one on each jungle path.
+const BLUE_BRUSHES: { BrushSpot } = {
+	{ From = at(58, 100), To = at(58, 118), Radius = BRUSH_RADIUS },
+	{ From = at(290, 342), To = at(308, 342), Radius = BRUSH_RADIUS },
+	{ From = at(168, 212), To = at(176, 204), Radius = BRUSH_RADIUS },
+	{ From = at(184, 236), To = at(196, 224), Radius = BRUSH_RADIUS },
+	{ From = at(88, 118), To = at(96, 126), Radius = BRUSH_RADIUS },
+	{ From = at(246, 276), To = at(256, 286), Radius = BRUSH_RADIUS },
+	{ From = at(78, 182), To = at(78, 196), Radius = BRUSH_RADIUS },
+	{ From = at(204, 322), To = at(218, 322), Radius = BRUSH_RADIUS },
+}
+
 const BLUE_LAUNCH_PADS: { LaunchPad } = {
 	{ Team = "Blue", Position = at(80, 255), Landing = at(150, 150) },
 	{ Team = "Blue", Position = at(135, 305), Landing = at(250, 250) },
@@ -200,6 +224,18 @@ local function buildWalls(): { WallSpot }
 	return walls
 end
 
+local function buildBrushes(): { BrushSpot }
+	local brushes = table.clone(BLUE_BRUSHES)
+	for _, brush in BLUE_BRUSHES do
+		table.insert(brushes, {
+			From = mirror(brush.From),
+			To = mirror(brush.To),
+			Radius = brush.Radius,
+		})
+	end
+	return brushes
+end
+
 local function buildLaunchPads(): { LaunchPad }
 	local pads = table.clone(BLUE_LAUNCH_PADS)
 	for _, pad in BLUE_LAUNCH_PADS do
@@ -225,6 +261,7 @@ Module.Routes = buildRoutes()
 Module.Structures = buildStructures()
 Module.Camps = buildCamps()
 Module.Walls = buildWalls()
+Module.Brushes = buildBrushes()
 Module.LaunchPads = buildLaunchPads()
 
 Module.Bases = {

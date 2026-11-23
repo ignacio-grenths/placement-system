@@ -170,6 +170,7 @@ local function resolveAim(unit: Unit, info: AbilityInfo, aim: Aim?): (Vector3?, 
 			not target
 			or target.IsDead
 			or not target.IsTargetable
+			or not UnitServerService:IsVisibleTo(target, unit.Team)
 			or not AbilityRules.matchesFilter(unit.Team, target.Team, target.Kind, filter)
 		then
 			return nil, nil, nil
@@ -599,11 +600,39 @@ function Module:FireSkillshot(caster: Unit, options: SkillshotOptions)
 	})
 end
 
+local function getEffectPoints(effect: Effect): { Vector3 }
+	if effect.Kind == "Projectile" then
+		local reach = effect.Direction.Unit * effect.Range
+		return { effect.Origin, effect.Origin + reach / 2, effect.Origin + reach }
+	elseif effect.Kind == "Ring" then
+		return { effect.Position }
+	else
+		return { effect.From, effect.To }
+	end
+end
+
 --[[
-	Shows a visual effect to every client. It changes nothing in the game.
+	Shows a visual effect to every client that can see part of it. It
+	changes nothing in the game.
 ]]
 function Module:PlayEffect(effect: Effect)
-	AbilityNetwork.Effect:FireAllClients(effect)
+	local points = getEffectPoints(effect)
+	for _, player in Players:GetPlayers() do
+		-- Annotated because luau-lsp widens the narrowed team to string.
+		local team: UnitTypes.Team? = UnitServerService:GetViewerTeam(player)
+		local isSeen = team == nil
+		if team then
+			for _, point in points do
+				if UnitServerService:IsPointVisibleTo(point, team) then
+					isSeen = true
+					break
+				end
+			end
+		end
+		if isSeen then
+			AbilityNetwork.Effect:FireClient(player, effect)
+		end
+	end
 end
 
 function Module:Init()

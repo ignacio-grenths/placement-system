@@ -13,10 +13,14 @@ const ProgressionCatalog = require("@game/ServerScriptService/Modules/Data/Progr
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
+const VisionServerService = require(
+	"@game/ServerScriptService/Modules/Systems/Gameplay/VisionSystem/SystemPackage/VisionServerService"
+)
 
 const ItemShopServerService = require("../SystemPackage/ItemShopServerService")
 
--- Seconds between two checks of who earns Tracker's Cloak's extra speed.
+-- Seconds between two checks of who earns Tracker's Cloak's extra speed and
+-- whom Bounty Hunter reveals.
 const CLOAK_INTERVAL = 0.25
 const RECALL_SLOT = "B"
 
@@ -205,6 +209,22 @@ local function modifyShield(unit: Unit, strength: number, caster: Unit?): number
 	return strength * 2
 end
 
+-- Bounty Hunter: enemy heroes low on health near the hunter can't hide.
+local function revealPrey(hunter: Unit)
+	local prey = UnitServerService:FindInRadius(
+		hunter.Position,
+		EFFECTS.BountyRevealRadius,
+		function(other)
+			return other.Kind == "Hero"
+				and other.Team ~= hunter.Team
+				and getHealthShare(other) < EFFECTS.BountyRevealHealthShare
+		end
+	)
+	for _, hero in prey do
+		VisionServerService:Reveal(hero, hunter.Team, CLOAK_INTERVAL * 2)
+	end
+end
+
 local function onHeartbeat(frameTime: number)
 	cloakTimer += frameTime
 	if cloakTimer < CLOAK_INTERVAL then
@@ -212,21 +232,23 @@ local function onHeartbeat(frameTime: number)
 	end
 	cloakTimer = 0
 
-	-- Tracker's Cloak: extra speed for a hero who hasn't fought lately.
 	local now = os.clock()
 	for _, unit in UnitServerService:GetUnits() do
+		if unit.Kind ~= "Hero" or not unit.OwnerPlayer or unit.IsDead or unit.IsRemoved then
+			continue
+		end
+		-- Tracker's Cloak: extra speed for a hero who hasn't fought lately.
 		if
-			unit.Kind == "Hero"
-			and unit.OwnerPlayer
-			and not unit.IsDead
-			and not unit.IsRemoved
-			and now - (lastCombatTimes[unit] or 0) >= EFFECTS.CloakIdleSeconds
+			now - (lastCombatTimes[unit] or 0) >= EFFECTS.CloakIdleSeconds
 			and holds(unit, "TrackersCloak")
 		then
 			UnitServerService:AddModifier(unit, "Item.TrackersCloak.Idle", {
 				Stat = "MoveSpeed",
 				Add = EFFECTS.CloakMoveSpeed,
 			}, CLOAK_INTERVAL * 2)
+		end
+		if hasPair(unit, "BountyHunter") then
+			revealPrey(unit)
 		end
 	end
 end

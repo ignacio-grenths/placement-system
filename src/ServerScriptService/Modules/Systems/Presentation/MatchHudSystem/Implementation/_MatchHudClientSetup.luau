@@ -273,7 +273,7 @@ local function buildMinimapDots(): { MinimapDot }
 	local renderTime = UnitClientService:GetRenderTime()
 	local dots = {}
 	for _, unit in UnitClientService:GetUnits() do
-		if not unit or unit.IsDead or unit.Kind == "Summon" then
+		if not unit or unit.IsDead or unit.IsHidden or unit.Kind == "Summon" then
 			continue
 		end
 		local isLocalHero = localHero ~= nil and unit.Id == localHero.Id

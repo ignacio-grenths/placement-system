@@ -44,6 +44,10 @@ export type ClientUnit = {
 	IsStunned: boolean,
 	IsRooted: boolean,
 	IsEnlarged: boolean,
+	-- Out of this client's team's sight, and so not drawn. True until the
+	-- first snapshot, so an enemy never flashes at its spawn point. While
+	-- hidden, the other fields keep what was last seen.
+	IsHidden: boolean,
 	-- The server's MoveEpoch from the last snapshot, or -1 before the first.
 	Epoch: number,
 	-- Server-time samples, oldest first. Never empty.
@@ -113,9 +117,9 @@ local function onUnitsAdded(infos: { UnitInfo })
 			IsStunned = false,
 			IsRooted = false,
 			IsEnlarged = false,
+			IsHidden = true,
 			Epoch = -1,
-			-- Time zero sorts before any snapshot, so the first snapshot
-			-- blends from the spawn point.
+			-- Holds the spawn point until the first snapshot replaces it.
 			Samples = {
 				{ Time = 0, Position = info.Position, Facing = 0 },
 			},
@@ -154,9 +158,16 @@ local function onSnapshot(payload: buffer)
 			continue
 		end
 
+		if bit32.btest(entry.Flags, UnitSnapshotCodec.Flags.Hidden) then
+			unit.IsHidden = true
+			continue
+		end
+
 		-- A new epoch means the server teleported the unit (a blink, a recall,
-		-- a revive), so it jumps instead of sliding across the map.
-		local isTeleport = unit.Epoch >= 0 and entry.Epoch ~= unit.Epoch
+		-- a revive), so it jumps instead of sliding across the map. A unit
+		-- coming out of hiding jumps too, from where it was last seen.
+		local isTeleport = unit.IsHidden or (unit.Epoch >= 0 and entry.Epoch ~= unit.Epoch)
+		unit.IsHidden = false
 		unit.Epoch = entry.Epoch
 		unit.IsDead = bit32.btest(entry.Flags, UnitSnapshotCodec.Flags.Dead)
 		unit.IsTargetable = not bit32.btest(entry.Flags, UnitSnapshotCodec.Flags.Untargetable)
