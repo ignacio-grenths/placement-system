@@ -44,6 +44,8 @@ const CAST_MOTIONS: { [string]: Motion? } = {
 	["Rin.R"] = "Raise",
 	["Yuki.W"] = "Raise",
 	["Yuki.R"] = "Raise",
+	["Kenji.E"] = "Slash",
+	["Kenji.R"] = "Blast",
 	["Spell.Warp"] = "Raise",
 }
 
@@ -52,6 +54,7 @@ const MOTIONLESS: { [string]: true? } = {
 	["Haru.E"] = true,
 	["Ryuka.E"] = true,
 	["SeoDan.E"] = true,
+	["Kenji.W"] = true,
 	["Spell.Blink"] = true,
 }
 

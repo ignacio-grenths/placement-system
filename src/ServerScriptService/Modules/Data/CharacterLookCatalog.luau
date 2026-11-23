@@ -902,6 +902,96 @@ local function yuki(): RigSpec
 	}
 end
 
+-- The Gunslinger: spiky black hair with amber goggles pushed up on it, a
+-- long green coat with a popped collar and tails, a holster, and a pistol.
+local function kenji(): RigSpec
+	local hair = Color3.fromRGB(28, 28, 34)
+	local coat = Color3.fromRGB(64, 116, 86)
+	local collar = Color3.fromRGB(48, 90, 66)
+	local leather = Color3.fromRGB(92, 62, 40)
+	local gunmetal = Color3.fromRGB(92, 98, 110)
+	local head: { PartPlan } = {
+		hairCap(hair),
+		lock(hair, Vector3.new(-0.35, 0.7, 0.1), Vector3.new(-0.65, 1.2, 0.5), 0.4),
+		lock(hair, Vector3.new(0, 0.8, 0.05), Vector3.new(0, 1.35, 0.4), 0.42),
+		lock(hair, Vector3.new(0.35, 0.7, 0.1), Vector3.new(0.65, 1.2, 0.5), 0.4),
+		lock(hair, Vector3.new(0, 0.5, 0.5), Vector3.new(0, 0.1, 1.2), 0.45),
+		lock(hair, Vector3.new(-0.25, 0.72, -0.38), Vector3.new(-0.35, 0.25, -0.86), 0.32),
+		lock(hair, Vector3.new(0.25, 0.72, -0.38), Vector3.new(0.5, 0.3, -0.84), 0.32),
+	}
+	local goggle: { PartPlan } = {
+		{
+			Shape = "Cylinder",
+			Size = Vector3.new(0.44, 0.1, 0.44),
+			Offset = CFrame.new(-0.22, 0.56, -0.71) * CFrame.Angles(math.pi / 2, 0, 0),
+			Color = Color3.fromRGB(40, 40, 46),
+			Material = Enum.Material.Metal,
+		},
+		glowing({
+			Shape = "Cylinder",
+			Size = Vector3.new(0.34, 0.1, 0.34),
+			Offset = CFrame.new(-0.22, 0.56, -0.76) * CFrame.Angles(math.pi / 2, 0, 0),
+			Color = Color3.fromRGB(255, 172, 44),
+		}),
+	}
+	local torso: { PartPlan } = {
+		{
+			Shape = "Block",
+			Size = Vector3.new(0.5, 1.2, 0.06),
+			Offset = CFrame.new(0, 0.15, -0.42),
+			Color = Color3.fromRGB(222, 216, 200),
+		},
+		{
+			Shape = "Block",
+			Size = Vector3.new(1.4, 0.42, 0.95),
+			Offset = CFrame.new(0, 0.9, 0.05),
+			Color = collar,
+		},
+		belt(leather),
+		{
+			Shape = "Block",
+			Size = Vector3.new(0.25, 0.5, 0.35),
+			Offset = CFrame.new(-0.8, -0.8, 0),
+			Color = leather,
+		},
+	}
+	local coatTail: PartPlan = {
+		Shape = "Block",
+		Size = Vector3.new(0.75, 1.9, 0.08),
+		Offset = CFrame.new(-0.38, -1.6, 0.42) * CFrame.Angles(0.1, 0, 0),
+		Color = coat,
+	}
+	local pistol: { PartPlan } = {
+		{
+			Shape = "Block",
+			Size = Vector3.new(0.16, 0.38, 0.2),
+			Offset = CFrame.new(0, -1.02, -0.08),
+			Color = Color3.fromRGB(35, 35, 40),
+		},
+		{
+			Shape = "Block",
+			Size = Vector3.new(0.2, 0.24, 0.9),
+			Offset = CFrame.new(0, -0.85, -0.42),
+			Color = gunmetal,
+			Material = Enum.Material.Metal,
+		},
+	}
+	return {
+		SkinColor = Color3.fromRGB(240, 208, 180),
+		HairColor = hair,
+		EyeColor = Color3.fromRGB(110, 140, 170),
+		TopColor = coat,
+		BottomColor = Color3.fromRGB(46, 46, 54),
+		ShoeColor = Color3.fromRGB(72, 46, 30),
+		AttackMotion = "Shoot",
+		Attachments = {
+			Head = join(head, withMirrors(goggle)),
+			Torso = join(torso, withMirrors({ coatTail })),
+			RightArm = pistol,
+		},
+	}
+end
+
 -- One of Seo Dan's shadow knights: a closed helmet with a glowing visor and
 -- crest, dark plate armor, and a violet-edged blade like Seo Dan's.
 local function shadowKnight(): RigSpec
@@ -975,6 +1065,7 @@ Module.Looks = {
 	Akane = akane(),
 	Rin = rin(),
 	Yuki = yuki(),
+	Kenji = kenji(),
 	ShadowKnight = shadowKnight(),
 } :: { [string]: RigSpec? }
 

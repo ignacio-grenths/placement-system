@@ -7,6 +7,7 @@ const AbilityServerService = require("../SystemPackage/AbilityServerService")
 const AkaneKit = require("@self/_AkaneKit")
 const BrakkKit = require("@self/_BrakkKit")
 const HaruKit = require("@self/_HaruKit")
+const KenjiKit = require("@self/_KenjiKit")
 const Recall = require("@self/_Recall")
 const RinKit = require("@self/_RinKit")
 const RyukaKit = require("@self/_RyukaKit")
@@ -25,6 +26,7 @@ const KITS = {
 	AkaneKit,
 	RinKit,
 	YukiKit,
+	KenjiKit,
 	SummonerSpells,
 	Trinkets,
 	Recall,

@@ -15,7 +15,11 @@ type Unit = UnitTypes.Unit
 
 local Module = {}
 
-local function isAbilityTarget(caster: Unit, other: Unit): boolean
+--[[
+	Returns whether the caster's abilities can hit the other unit: an enemy
+	unit that isn't a structure, and can be targeted right now.
+]]
+function Module.isAbilityTarget(caster: Unit, other: Unit): boolean
 	return other.IsTargetable
 		and AbilityRules.matchesFilter(caster.Team, other.Team, other.Kind, "EnemyUnit")
 end
@@ -26,7 +30,7 @@ end
 ]]
 function Module.findEnemiesAround(caster: Unit, center: Vector3, radius: number): { Unit }
 	return UnitServerService:FindInRadius(center, radius, function(other)
-		return isAbilityTarget(caster, other)
+		return Module.isAbilityTarget(caster, other)
 	end)
 end
 
@@ -53,7 +57,7 @@ function Module.findEnemiesAlongLine(
 ): { Unit }
 	local found = {}
 	for _, unit in UnitServerService:GetUnits() do
-		if unit.IsRemoved or unit.IsDead or not isAbilityTarget(caster, unit) then
+		if unit.IsRemoved or unit.IsDead or not Module.isAbilityTarget(caster, unit) then
 			continue
 		end
 		local offset = unit.Position - origin

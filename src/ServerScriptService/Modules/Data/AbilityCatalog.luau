@@ -430,6 +430,58 @@ Module.Abilities = {
 			SlowSeconds = 1,
 		},
 	},
+	-- Kenji: a marksman who wins on attacks, not abilities, and finishes
+	-- hurt heroes from far away.
+	["Kenji.Q"] = {
+		Name = "Ricochet Shot",
+		Description = "Fires a fast bullet at the first enemy in its path. It bounces to another.",
+		Cooldown = 7,
+		Cost = 45,
+		Targeting = "Direction",
+		Range = 22,
+		Values = {
+			Damage = { 80, 120, 160, 200 },
+			Speed = 110,
+			Width = 1.2,
+			BounceRange = 8,
+			BounceShare = 0.5,
+		},
+	},
+	["Kenji.W"] = {
+		Name = "Smoke Roll",
+		Description = "Rolls a short way. His next two attacks within a few seconds hit harder.",
+		Cooldown = 10,
+		Cost = 35,
+		Targeting = "Point",
+		Range = 6,
+		Values = { DashSpeed = 55, Hits = 2, BonusDamage = { 30, 45, 60, 75 }, Window = 4 },
+	},
+	["Kenji.E"] = {
+		Name = "Flash Grenade",
+		Description = "Lobs a grenade that blows up a moment later, hurting and slowing enemies.",
+		Cooldown = 12,
+		Cost = 50,
+		Targeting = "Point",
+		Range = 14,
+		Values = {
+			Delay = 0.6,
+			Damage = { 60, 90, 120, 150 },
+			Radius = 3.5,
+			SlowMultiplier = 0.6,
+			SlowSeconds = 1.5,
+		},
+	},
+	["Kenji.R"] = {
+		Name = "Final Bullet",
+		Description = "Aims for a moment, then fires a shot that hurts more "
+			.. "the more health the target is missing.",
+		Cooldown = 80,
+		Cost = 100,
+		Targeting = "Unit",
+		Range = 30,
+		TargetFilter = "EnemyHero",
+		Values = { AimTime = 1, Damage = { 250, 375, 500 }, MissingHealthShare = 0.2 },
+	},
 	["Spell.Blink"] = {
 		Name = "Blink",
 		Description = "Teleports a short distance.",

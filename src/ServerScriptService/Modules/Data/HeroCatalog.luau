@@ -262,6 +262,33 @@ Module.Heroes = {
 		SummonerSpells = { "Blink", "Scorch" },
 		SuggestedBuild = { "SwiftBoots", "KiConduit", "VoidShard", "StarfallPendant" },
 	},
+	-- Faster attacks than Ryuka for less reach.
+	Kenji = {
+		DisplayName = "Kenji",
+		Title = "the Gunslinger",
+		Role = "Bot",
+		Resource = "Mana",
+		MaxResource = 300,
+		ResourceRegen = 4,
+		ResourceRegenDelay = 0,
+		ResourceOnHeroHit = 0,
+		Abilities = { Q = "Kenji.Q", W = "Kenji.W", E = "Kenji.E", R = "Kenji.R" },
+		Stats = {
+			MaxHealth = 540,
+			Armor = 22,
+			AttackDamage = 60,
+			AttackRange = 15,
+			AttackInterval = 1.4,
+			MoveSpeed = 15.5,
+			Radius = 1.3,
+			ProjectileSpeed = 90,
+		},
+		Color = Color3.fromRGB(90, 160, 110),
+		SkillOrder = { "Q", "W", "E" },
+		Growth = { MaxHealth = 78, Armor = 3, AttackDamage = 3.2, MaxResource = 28 },
+		SummonerSpells = { "Blink", "Mend" },
+		SuggestedBuild = { "SwiftBoots", "BountyScope", "TrackersCloak", "EchoBlade" },
+	},
 } :: { [string]: HeroEntry }
 
 return Module
