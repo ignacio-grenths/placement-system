@@ -7,6 +7,8 @@ const UnitTypes = require(
 type UnitStats = UnitTypes.UnitStats
 
 export type VisualShape = "Ball" | "Block" | "Cylinder"
+-- Keep in sync with VisualStyle in UnitVisualsClientService.
+export type VisualStyle = "Plain" | "Hero" | "Alien" | "Tower" | "Gate" | "Core" | "Beast"
 
 export type UnitEntry = {
 	DisplayName: string,
@@ -17,6 +19,10 @@ export type UnitEntry = {
 		Size: Vector3,
 		-- Nil paints the unit in its team's color.
 		Color: Color3?,
+		-- Plain when nil.
+		Style: VisualStyle?,
+		-- Studs the unit floats up and down. Zero when nil.
+		Bob: number?,
 	},
 }
 
@@ -36,7 +42,7 @@ Module.Units = {
 			MoveSpeed = 11,
 			Radius = 1.2,
 		},
-		Visual = { Shape = "Ball", Size = Vector3.new(2.4, 2.4, 2.4) },
+		Visual = { Shape = "Ball", Size = Vector3.new(2.4, 2.4, 2.4), Style = "Alien", Bob = 0.2 },
 	},
 	Blip = {
 		DisplayName = "Blip",
@@ -50,7 +56,7 @@ Module.Units = {
 			Radius = 1,
 			ProjectileSpeed = 50,
 		},
-		Visual = { Shape = "Ball", Size = Vector3.new(2, 2, 2) },
+		Visual = { Shape = "Ball", Size = Vector3.new(2, 2, 2), Style = "Alien", Bob = 0.3 },
 	},
 	GrubTank = {
 		DisplayName = "Grub Tank",
@@ -64,7 +70,7 @@ Module.Units = {
 			Radius = 1.8,
 			ProjectileSpeed = 45,
 		},
-		Visual = { Shape = "Block", Size = Vector3.new(3.6, 2.6, 4.4) },
+		Visual = { Shape = "Block", Size = Vector3.new(3.6, 2.6, 4.4), Style = "Alien", Bob = 0.1 },
 	},
 	MegaZib = {
 		DisplayName = "Mega Zib",
@@ -77,7 +83,7 @@ Module.Units = {
 			MoveSpeed = 11,
 			Radius = 2,
 		},
-		Visual = { Shape = "Ball", Size = Vector3.new(4, 4, 4) },
+		Visual = { Shape = "Ball", Size = Vector3.new(4, 4, 4), Style = "Alien", Bob = 0.2 },
 	},
 	OuterTower = {
 		DisplayName = "Outer Tower",
@@ -91,7 +97,7 @@ Module.Units = {
 			Radius = 4,
 			ProjectileSpeed = 80,
 		},
-		Visual = { Shape = "Cylinder", Size = Vector3.new(8, 14, 8) },
+		Visual = { Shape = "Cylinder", Size = Vector3.new(8, 14, 8), Style = "Tower" },
 	},
 	InnerTower = {
 		DisplayName = "Inner Tower",
@@ -105,7 +111,7 @@ Module.Units = {
 			Radius = 4,
 			ProjectileSpeed = 80,
 		},
-		Visual = { Shape = "Cylinder", Size = Vector3.new(8, 16, 8) },
+		Visual = { Shape = "Cylinder", Size = Vector3.new(8, 16, 8), Style = "Tower" },
 	},
 	Gate = {
 		DisplayName = "Base Gate",
@@ -118,7 +124,7 @@ Module.Units = {
 			MoveSpeed = 0,
 			Radius = 5,
 		},
-		Visual = { Shape = "Block", Size = Vector3.new(10, 8, 10) },
+		Visual = { Shape = "Block", Size = Vector3.new(10, 8, 10), Style = "Gate" },
 	},
 	Core = {
 		DisplayName = "Core",
@@ -131,7 +137,7 @@ Module.Units = {
 			MoveSpeed = 0,
 			Radius = 7,
 		},
-		Visual = { Shape = "Ball", Size = Vector3.new(14, 14, 14) },
+		Visual = { Shape = "Ball", Size = Vector3.new(14, 14, 14), Style = "Core" },
 	},
 	-- Jungle monsters. Nil colors would paint them in the neutral yellow, so
 	-- each camp gets its own look. Tuned so a level 1 hero using only basic
@@ -152,6 +158,8 @@ Module.Units = {
 			Shape = "Ball",
 			Size = Vector3.new(2.4, 2.4, 2.4),
 			Color = Color3.fromRGB(120, 210, 90),
+			Style = "Beast",
+			Bob = 0.15,
 		},
 	},
 	Spitter = {
@@ -170,6 +178,8 @@ Module.Units = {
 			Shape = "Ball",
 			Size = Vector3.new(2.2, 2.2, 2.2),
 			Color = Color3.fromRGB(190, 230, 70),
+			Style = "Beast",
+			Bob = 0.25,
 		},
 	},
 	Crawler = {
@@ -187,6 +197,7 @@ Module.Units = {
 			Shape = "Block",
 			Size = Vector3.new(4, 2, 4),
 			Color = Color3.fromRGB(140, 100, 70),
+			Style = "Beast",
 		},
 	},
 	RiftToad = {
@@ -204,6 +215,7 @@ Module.Units = {
 			Shape = "Ball",
 			Size = Vector3.new(4.4, 3.4, 4.4),
 			Color = Color3.fromRGB(90, 160, 150),
+			Style = "Beast",
 		},
 	},
 	CrystalGolem = {
@@ -221,6 +233,7 @@ Module.Units = {
 			Shape = "Block",
 			Size = Vector3.new(5, 6, 5),
 			Color = Color3.fromRGB(110, 180, 255),
+			Style = "Beast",
 		},
 	},
 	EmberBeetle = {
@@ -238,6 +251,7 @@ Module.Units = {
 			Shape = "Ball",
 			Size = Vector3.new(5.6, 4, 5.6),
 			Color = Color3.fromRGB(255, 120, 50),
+			Style = "Beast",
 		},
 	},
 	Skyray = {
@@ -256,6 +270,8 @@ Module.Units = {
 			Shape = "Block",
 			Size = Vector3.new(10, 3, 8),
 			Color = Color3.fromRGB(120, 230, 255),
+			Style = "Beast",
+			Bob = 0.6,
 		},
 	},
 	HiveQueen = {
@@ -273,6 +289,8 @@ Module.Units = {
 			Shape = "Ball",
 			Size = Vector3.new(12, 10, 12),
 			Color = Color3.fromRGB(170, 70, 200),
+			Style = "Beast",
+			Bob = 0.3,
 		},
 	},
 } :: { [string]: UnitEntry }

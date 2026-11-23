@@ -19,19 +19,22 @@ const TEAM_COLORS: { [string]: Color3? } = {
 
 -- Colors, fonts, and sizes every HUD piece shares, so they read as one set.
 -- Sizes are UI units for a 1080p screen.
+-- The arena's sleek sci-fi look: deep navy glass panels, tight corners, and
+-- cyan edges. Gotham stays: the squared sci-fi fonts blur letters like a and
+-- o at HUD sizes.
 local Module = table.freeze({
 	Font = Enum.Font.GothamBold,
 	BodyFont = Enum.Font.GothamMedium,
 
-	PanelColor = Color3.fromRGB(20, 22, 30),
-	PanelTransparency = 0.15,
-	PanelCorner = UDim.new(0, 10),
+	PanelColor = Color3.fromRGB(10, 16, 30),
+	PanelTransparency = 0.2,
+	PanelCorner = UDim.new(0, 6),
 	PanelPadding = 10,
-	BarBackground = Color3.fromRGB(10, 10, 14),
+	BarBackground = Color3.fromRGB(6, 10, 20),
 
-	TextColor = Color3.fromRGB(240, 242, 248),
-	MutedTextColor = Color3.fromRGB(160, 165, 180),
-	StrokeColor = Color3.fromRGB(110, 140, 190),
+	TextColor = Color3.fromRGB(240, 244, 252),
+	MutedTextColor = Color3.fromRGB(150, 170, 205),
+	StrokeColor = Color3.fromRGB(70, 170, 255),
 
 	HealthColor = Color3.fromRGB(80, 200, 110),
 	ShieldColor = Color3.fromRGB(235, 240, 250),

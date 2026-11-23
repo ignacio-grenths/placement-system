@@ -355,9 +355,9 @@ MatchServer -> MatchServer: waits up to 30 s, bots take any no-shows
 <p>Lobby and matchmaking move to milestone 3, because role select needs all five heroes, and they arrive in milestone 2. Until then, joining the place starts a match against bots directly, which is also how milestones 1 and 2 are tested in Studio.</p>
 <rk-table>
 ID | Item | System | Milestone | Status
-MB-1 | Greybox Crashpoint Valley, drawn on each client from the `MapLayout` data module that every system reads | MapSystem | M1 | [done]
+MB-1 | Crashpoint Valley drawn on each client from the `MapLayout` data module every system reads, in a sleek sci-fi look: dark metal floor with a neon grid, lanes lit blue on Blue's half and red on Red's, an energy river, neon crash ring, glowing camp and launch pads, a lit perimeter wall, and crashed-mothership wreckage outside it. Lighting (Future, bloom, color grade) lives in `default.project.json` | MapSystem | M1 | [done]
 MB-2 | Unit records, server tick, damage, death, unit spacing. Pathing around jungle walls comes with the walls | UnitSystem | M1 | [progress]
-MB-3 | Snapshot stream at 15 per second, client smoothing, health bars, placeholder models | UnitVisualsSystem | M1 | [done]
+MB-3 | Snapshot stream at 15 per second, client smoothing, health bars, and styled stand-in models built from primitives: hover-suit heroes, bobbing aliens with glowing eyes, crystal-topped tower pylons, energy-field gates, glass cores, and monsters on rings in their camp's color | UnitVisualsSystem | M1 | [done]
 MB-4 | Right-click move and attack, S to stop, tap to move, gamepad stick, QWER quick cast, D and F, B to recall. Roblox's thumbstick is off, since heroes walk by tapping | HeroControlSystem, AbilitySystem | M1 | [done]
 MB-5 | Locked overhead camera, Y toggles edge panning on PC, Space to recenter, wheel to zoom | CameraSystem | M1 | [done]
 MB-6 | Cooldowns, skillshots, dashes, channels, shields, stuns, roots, slows, and buffs, with every number in `AbilityCatalog` | AbilitySystem | M1 | [done]

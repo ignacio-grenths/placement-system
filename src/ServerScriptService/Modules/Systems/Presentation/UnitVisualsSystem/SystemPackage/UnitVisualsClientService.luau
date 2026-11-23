@@ -13,6 +13,7 @@ const HEALTH_BAR_SIZES = {
 	Minion = Vector2.new(34, 5),
 	Monster = Vector2.new(50, 6),
 	Structure = Vector2.new(110, 10),
+	Summon = Vector2.new(34, 5),
 }
 const HEALTH_BAR_GAP = 1.5
 const HEALTH_BAR_BACKGROUND = Color3.fromRGB(20, 20, 24)
@@ -22,12 +23,22 @@ const LOCAL_HERO_BAR_COLOR = Color3.fromRGB(90, 220, 110)
 const UNTARGETABLE_FILL_TRANSPARENCY = 0.6
 const RING_THICKNESS = 0.2
 const RING_PADDING = 1.5
+-- Studs units stand above the ground, clear of the map's flat markings.
+const GROUND_CLEARANCE = 0.3
+-- Radians per second of a floating unit's bob.
+const BOB_SPEED = 3
 const SHOT_SIZE = 0.8
 const SHOT_HEIGHT = 2.5
 const PICK_DISTANCE = 1000
 -- Studs of slack around a unit when a click lands on the ground near it, so
 -- small aliens are easy to target.
 const PICK_TOLERANCE = 1.5
+-- Light enough to stand out from the map's dark floor.
+const METAL_COLOR = Color3.fromRGB(62, 68, 86)
+const EYE_COLOR = Color3.fromRGB(235, 250, 255)
+const BEAST_EYE_COLOR = Color3.fromRGB(255, 235, 170)
+const BLACK = Color3.new(0, 0, 0)
+const WHITE = Color3.new(1, 1, 1)
 
 const UnitTypes = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitTypes"
@@ -37,6 +48,9 @@ type ClientUnit = UnitClientService.ClientUnit
 type Team = UnitTypes.Team
 
 export type VisualShape = "Ball" | "Block" | "Cylinder"
+-- How a unit is built: Plain is the bare shape; the others add detail
+-- around it sized from the shape.
+export type VisualStyle = "Plain" | "Hero" | "Alien" | "Tower" | "Gate" | "Core" | "Beast"
 
 export type VisualSpec = {
 	Shape: VisualShape,
@@ -44,23 +58,43 @@ export type VisualSpec = {
 	Size: Vector3,
 	-- Nil paints the unit in its team's color.
 	Color: Color3?,
+	-- Plain when nil.
+	Style: VisualStyle?,
 	HasTeamRing: boolean?,
+	-- Studs the unit floats up and down. Zero when nil.
+	Bob: number?,
 	-- Studs per second of the unit's attack shots. Nil for melee units.
 	ProjectileSpeed: number?,
-	-- Of the body. Zero when nil.
+	-- Of every part. Zero when nil.
 	Transparency: number?,
 	-- Hides the health bar, for units that can never be hit, like a clone.
 	HidesHealthBar: boolean?,
+}
+
+-- A cylinder stands upright: Size.Y is its height and Size.X its diameter.
+type PartShape = "Ball" | "Block" | "Cylinder"
+
+type PartPlan = {
+	Shape: PartShape,
+	Size: Vector3,
+	-- From the body's center before the unit turns. -Z is the unit's front.
+	Offset: CFrame,
+	Color: Color3,
+	Material: Enum.Material?,
+	Transparency: number?,
 }
 
 type Visual = {
 	Unit: ClientUnit,
 	Body: BasePart,
 	Parts: { BasePart },
-	BodyTransparency: number,
+	-- Each part's transparency while the unit is alive, by index in Parts.
+	PartTransparencies: { number },
 	HasHealthBar: boolean,
 	Rotation: CFrame,
 	HeightOffset: number,
+	BobAmplitude: number,
+	BobPhase: number,
 	HealthBar: BillboardGui,
 	HealthFill: Frame,
 	ShownHealth: number,
@@ -95,51 +129,381 @@ local folder: Folder? = nil
 local movedParts: { BasePart } = {}
 local movedCFrames: { CFrame } = {}
 
-local function createBody(spec: VisualSpec, color: Color3): (BasePart, CFrame)
-	local body = Instance.new("Part")
-	body.Anchored = true
-	body.CanCollide = false
-	body.CanTouch = false
-	body.Material = Enum.Material.SmoothPlastic
-	body.Color = color
-	body.Transparency = spec.Transparency or 0
-
-	if spec.Shape == "Ball" then
-		body.Shape = Enum.PartType.Ball
-		body.Size = spec.Size
-		return body, CFrame.identity
-	elseif spec.Shape == "Cylinder" then
-		-- A cylinder part runs along its X axis, so it is stood upright.
-		body.Shape = Enum.PartType.Cylinder
-		body.Size = Vector3.new(spec.Size.Y, spec.Size.X, spec.Size.Z)
-		return body, CFrame.Angles(0, 0, math.pi / 2)
-	else
-		body.Size = spec.Size
-		return body, CFrame.identity
-	end
+local function shade(color: Color3, amount: number): Color3
+	return color:Lerp(BLACK, amount)
 end
 
-local function createTeamRing(unit: ClientUnit, body: BasePart, spec: VisualSpec): Part
-	local diameter = unit.Radius * 2 + RING_PADDING
-	local ring = Instance.new("Part")
-	ring.Shape = Enum.PartType.Cylinder
-	ring.Size = Vector3.new(RING_THICKNESS, diameter, diameter)
-	ring.Color = teamColors[unit.Team]
-	ring.Material = Enum.Material.Neon
-	ring.CanCollide = false
-	ring.CanTouch = false
-	ring.CanQuery = false
-	ring.Massless = true
-	ring.CastShadow = false
-	ring.CFrame = CFrame.new(0, -spec.Size.Y / 2 + RING_THICKNESS / 2, 0)
-		* CFrame.Angles(0, 0, math.pi / 2)
+local function lighten(color: Color3, amount: number): Color3
+	return color:Lerp(WHITE, amount)
+end
 
+local function centered(shape: PartShape, size: Vector3, color: Color3): PartPlan
+	return {
+		Shape = shape,
+		Size = size,
+		Offset = CFrame.identity,
+		Color = color,
+	}
+end
+
+--[[
+	A hover-suit: torso, helmet with a glowing visor, shoulder plates, a chest
+	core, and a hover skirt, all scaled from the spec's size.
+]]
+local function planHero(
+	spec: VisualSpec,
+	color: Color3,
+	teamColor: Color3
+): (PartPlan, { PartPlan })
+	local width = spec.Size.X
+	local height = spec.Size.Y
+	local shoulder = {
+		Shape = "Block" :: PartShape,
+		Size = Vector3.new(width * 0.3, height * 0.11, width * 0.5),
+		Color = shade(color, 0.35),
+	}
+	return centered("Block", Vector3.new(width * 0.8, height * 0.42, width * 0.6), color),
+		{
+			{
+				Shape = "Cylinder",
+				Size = Vector3.new(width * 0.55, height * 0.28, width * 0.55),
+				Offset = CFrame.new(0, -height * 0.34, 0),
+				Color = METAL_COLOR,
+				Material = Enum.Material.Metal,
+			},
+			{
+				Shape = "Ball",
+				Size = Vector3.one * width * 0.6,
+				Offset = CFrame.new(0, height * 0.37, 0),
+				Color = lighten(color, 0.15),
+			},
+			{
+				Shape = "Block",
+				Size = Vector3.new(width * 0.42, height * 0.06, width * 0.1),
+				Offset = CFrame.new(0, height * 0.38, -width * 0.27),
+				Color = teamColor,
+				Material = Enum.Material.Neon,
+			},
+			{
+				Shape = shoulder.Shape,
+				Size = shoulder.Size,
+				Offset = CFrame.new(-width * 0.5, height * 0.17, 0),
+				Color = shoulder.Color,
+			},
+			{
+				Shape = shoulder.Shape,
+				Size = shoulder.Size,
+				Offset = CFrame.new(width * 0.5, height * 0.17, 0),
+				Color = shoulder.Color,
+			},
+			{
+				Shape = "Ball",
+				Size = Vector3.one * width * 0.21,
+				Offset = CFrame.new(0, height * 0.06, -width * 0.3),
+				Color = teamColor,
+				Material = Enum.Material.Neon,
+			},
+		}
+end
+
+--[[
+	Where an eye sits: high on the front, so the camera, which looks from
+	behind and above, still catches it over the top of a unit facing away.
+	side is -1 for the left eye and 1 for the right.
+]]
+local function getEyeOffset(spec: VisualSpec, side: number): CFrame
+	local size = spec.Size
+	if spec.Shape == "Ball" then
+		local radius = math.min(size.X, size.Y, size.Z) / 2
+		return CFrame.new(Vector3.new(side * 0.35, 0.55, -0.75).Unit * radius * 0.92)
+	end
+	return CFrame.new(side * size.X * 0.22, size.Y / 2, -size.Z * 0.3)
+end
+
+--[[
+	A little alien: the spec's shape in its team's color, with two glowing
+	eyes and an antenna.
+]]
+local function planAlien(
+	spec: VisualSpec,
+	color: Color3,
+	teamColor: Color3
+): (PartPlan, { PartPlan })
+	local size = spec.Size
+	local eye = math.min(size.X, size.Y) * 0.3
+	return centered(spec.Shape, size, color),
+		{
+			{
+				Shape = "Ball",
+				Size = Vector3.one * eye,
+				Offset = getEyeOffset(spec, -1),
+				Color = EYE_COLOR,
+				Material = Enum.Material.Neon,
+			},
+			{
+				Shape = "Ball",
+				Size = Vector3.one * eye,
+				Offset = getEyeOffset(spec, 1),
+				Color = EYE_COLOR,
+				Material = Enum.Material.Neon,
+			},
+			{
+				Shape = "Cylinder",
+				Size = Vector3.new(0.15, size.Y * 0.35, 0.15),
+				Offset = CFrame.new(0, size.Y * 0.62, 0),
+				Color = METAL_COLOR,
+			},
+			{
+				Shape = "Ball",
+				Size = Vector3.one * 0.45,
+				Offset = CFrame.new(0, size.Y * 0.82, 0),
+				Color = teamColor,
+				Material = Enum.Material.Neon,
+			},
+		}
+end
+
+--[[
+	A pylon: a dark column on a wide base with glowing stripes, under a
+	floating crystal in its team's color.
+]]
+local function planTower(
+	spec: VisualSpec,
+	_color: Color3,
+	teamColor: Color3
+): (PartPlan, { PartPlan })
+	local width = spec.Size.X
+	local height = spec.Size.Y
+	local stripe = Vector3.new(width * 0.06, height * 0.6, width * 0.06)
+	local body = centered(
+		"Cylinder",
+		Vector3.new(width * 0.5, height * 0.8, width * 0.5),
+		shade(teamColor, 0.5)
+	)
+	body.Material = Enum.Material.Metal
+	return body,
+		{
+			{
+				Shape = "Cylinder",
+				Size = Vector3.new(width, height * 0.1, width),
+				Offset = CFrame.new(0, -height * 0.45, 0),
+				Color = METAL_COLOR,
+				Material = Enum.Material.Metal,
+			},
+			{
+				Shape = "Cylinder",
+				Size = Vector3.new(width * 0.62, height * 0.05, width * 0.62),
+				Offset = CFrame.new(0, height * 0.4, 0),
+				Color = METAL_COLOR,
+				Material = Enum.Material.Metal,
+			},
+			{
+				Shape = "Block",
+				Size = Vector3.one * width * 0.28,
+				Offset = CFrame.new(0, height * 0.53, 0)
+					* CFrame.Angles(math.rad(45), 0, math.rad(45)),
+				Color = teamColor,
+				Material = Enum.Material.Neon,
+			},
+			{
+				Shape = "Block",
+				Size = stripe,
+				Offset = CFrame.new(0, 0, -width * 0.25),
+				Color = teamColor,
+				Material = Enum.Material.Neon,
+			},
+			{
+				Shape = "Block",
+				Size = stripe,
+				Offset = CFrame.new(0, 0, width * 0.25),
+				Color = teamColor,
+				Material = Enum.Material.Neon,
+			},
+		}
+end
+
+--[[
+	An energy gate: a shimmering field held between four capped pillars.
+]]
+local function planGate(
+	spec: VisualSpec,
+	_color: Color3,
+	teamColor: Color3
+): (PartPlan, { PartPlan })
+	local width = spec.Size.X
+	local height = spec.Size.Y
+	local body = centered("Block", Vector3.new(width * 0.7, height * 0.75, width * 0.7), teamColor)
+	body.Material = Enum.Material.ForceField
+	local parts: { PartPlan } = {
+		{
+			Shape = "Block",
+			Size = Vector3.new(width * 0.95, height * 0.06, width * 0.95),
+			Offset = CFrame.new(0, -height * 0.47, 0),
+			Color = METAL_COLOR,
+			Material = Enum.Material.Metal,
+		},
+	}
+	for _, corner in
+		{ Vector2.new(-1, -1), Vector2.new(1, -1), Vector2.new(-1, 1), Vector2.new(1, 1) }
+	do
+		local x = corner.X * width * 0.38
+		local z = corner.Y * width * 0.38
+		table.insert(parts, {
+			Shape = "Block",
+			Size = Vector3.new(width * 0.14, height, width * 0.14),
+			Offset = CFrame.new(x, 0, z),
+			Color = METAL_COLOR,
+			Material = Enum.Material.Metal,
+		})
+		table.insert(parts, {
+			Shape = "Block",
+			Size = Vector3.new(width * 0.16, height * 0.05, width * 0.16),
+			Offset = CFrame.new(x, height * 0.52, z),
+			Color = teamColor,
+			Material = Enum.Material.Neon,
+		})
+	end
+	return body, parts
+end
+
+--[[
+	A core: a glass sphere around a glowing heart, ringed and set on a base.
+]]
+local function planCore(
+	spec: VisualSpec,
+	_color: Color3,
+	teamColor: Color3
+): (PartPlan, { PartPlan })
+	local size = spec.Size.X
+	local body = centered("Ball", Vector3.one * size, shade(teamColor, 0.2))
+	body.Material = Enum.Material.Glass
+	body.Transparency = 0.4
+	return body,
+		{
+			{
+				Shape = "Ball",
+				Size = Vector3.one * size * 0.45,
+				Offset = CFrame.identity,
+				Color = teamColor,
+				Material = Enum.Material.Neon,
+			},
+			{
+				Shape = "Cylinder",
+				Size = Vector3.new(size * 1.25, 0.25, size * 1.25),
+				Offset = CFrame.Angles(math.rad(12), 0, 0),
+				Color = teamColor,
+				Material = Enum.Material.Neon,
+				Transparency = 0.5,
+			},
+			{
+				Shape = "Cylinder",
+				-- Narrower than the team ring around the core, so the ring shows.
+				Size = Vector3.new(size * 0.95, size * 0.1, size * 0.95),
+				Offset = CFrame.new(0, -size * 0.5, 0),
+				Color = METAL_COLOR,
+				Material = Enum.Material.Metal,
+			},
+		}
+end
+
+--[[
+	A jungle monster: the spec's shape in its own color, with warm glowing
+	eyes.
+]]
+local function planBeast(
+	spec: VisualSpec,
+	color: Color3,
+	_teamColor: Color3
+): (PartPlan, { PartPlan })
+	local size = spec.Size
+	local eye = math.min(size.X, size.Y) * 0.18
+	return centered(spec.Shape, size, color),
+		{
+			{
+				Shape = "Ball",
+				Size = Vector3.one * eye,
+				Offset = getEyeOffset(spec, -1),
+				Color = BEAST_EYE_COLOR,
+				Material = Enum.Material.Neon,
+			},
+			{
+				Shape = "Ball",
+				Size = Vector3.one * eye,
+				Offset = getEyeOffset(spec, 1),
+				Color = BEAST_EYE_COLOR,
+				Material = Enum.Material.Neon,
+			},
+		}
+end
+
+local function planPlain(
+	spec: VisualSpec,
+	color: Color3,
+	_teamColor: Color3
+): (PartPlan, { PartPlan })
+	return centered(spec.Shape, spec.Size, color), {}
+end
+
+const PLANNERS: { [VisualStyle]: (VisualSpec, Color3, Color3) -> (PartPlan, { PartPlan }) } = {
+	Plain = planPlain,
+	Hero = planHero,
+	Alien = planAlien,
+	Tower = planTower,
+	Gate = planGate,
+	Core = planCore,
+	Beast = planBeast,
+}
+
+local function createPart(plan: PartPlan, transparency: number): BasePart
+	local part = Instance.new("Part")
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanTouch = false
+	part.CastShadow = false
+	part.Color = plan.Color
+	part.Material = plan.Material or Enum.Material.SmoothPlastic
+	part.Transparency = math.max(plan.Transparency or 0, transparency)
+
+	if plan.Shape == "Ball" then
+		part.Shape = Enum.PartType.Ball
+		part.Size = plan.Size
+		part.CFrame = plan.Offset
+	elseif plan.Shape == "Cylinder" then
+		-- A cylinder part runs along its X axis, so it is stood upright.
+		part.Shape = Enum.PartType.Cylinder
+		part.Size = Vector3.new(plan.Size.Y, plan.Size.X, plan.Size.Z)
+		part.CFrame = plan.Offset * CFrame.Angles(0, 0, math.pi / 2)
+	else
+		part.Size = plan.Size
+		part.CFrame = plan.Offset
+	end
+	return part
+end
+
+--[[
+	Fixes a detail part to the body, so moving the body carries it along.
+	The body has to be at the origin, unturned, when this runs.
+]]
+local function attach(part: BasePart, body: BasePart)
+	part.Anchored = false
+	part.Massless = true
+	part.CanQuery = false
 	local weld = Instance.new("WeldConstraint")
 	weld.Part0 = body
-	weld.Part1 = ring
-	weld.Parent = ring
-	ring.Parent = body
-	return ring
+	weld.Part1 = part
+	weld.Parent = part
+	part.Parent = body
+end
+
+local function createRing(unit: ClientUnit, spec: VisualSpec, color: Color3): BasePart
+	local diameter = unit.Radius * 2 + RING_PADDING
+	return createPart({
+		Shape = "Cylinder",
+		Size = Vector3.new(diameter, RING_THICKNESS, diameter),
+		Offset = CFrame.new(0, -spec.Size.Y / 2 + RING_THICKNESS / 2, 0),
+		Color = color,
+		Material = Enum.Material.Neon,
+	}, spec.Transparency or 0)
 end
 
 local function getBarColor(unit: ClientUnit): Color3
@@ -186,15 +550,37 @@ local function addVisual(unit: ClientUnit)
 	end
 
 	local spec = specs[unit.TypeId] or DEFAULT_SPEC
-	local body, rotation = createBody(spec, spec.Color or teamColors[unit.Team])
+	local teamColor = teamColors[unit.Team]
+	local color = spec.Color or teamColor
+	local transparency = spec.Transparency or 0
+	-- Annotated because luau-lsp widens the "Plain" default to string.
+	local style: VisualStyle = spec.Style or "Plain"
+	local bodyPlan, detailPlans = PLANNERS[style](spec, color, teamColor)
+
+	local body = createPart(bodyPlan, transparency)
 	body.Name = unit.TypeId
-	body.CFrame = rotation
 	body:SetAttribute("UnitId", unit.Id)
+	-- Details are placed around the body while it sits at the origin, so
+	-- this is the turn that stands a cylinder body upright.
+	local rotation = body.CFrame
 
 	local parts: { BasePart } = { body }
-	if spec.HasTeamRing then
-		table.insert(parts, createTeamRing(unit, body, spec))
+	for _, plan in detailPlans do
+		local part = createPart(plan, transparency)
+		attach(part, body)
+		table.insert(parts, part)
 	end
+	if spec.HasTeamRing then
+		local ring = createRing(unit, spec, if spec.Style == "Beast" then color else teamColor)
+		attach(ring, body)
+		table.insert(parts, ring)
+	end
+
+	local partTransparencies = table.create(#parts)
+	for _, part in parts do
+		table.insert(partTransparencies, part.Transparency)
+	end
+
 	local healthBar, healthFill = createHealthBar(unit, body, spec)
 	local hasHealthBar = not spec.HidesHealthBar
 	healthBar.Enabled = hasHealthBar
@@ -203,10 +589,13 @@ local function addVisual(unit: ClientUnit)
 		Unit = unit,
 		Body = body,
 		Parts = parts,
-		BodyTransparency = body.Transparency,
+		PartTransparencies = partTransparencies,
 		HasHealthBar = hasHealthBar,
 		Rotation = rotation,
-		HeightOffset = spec.Size.Y / 2,
+		HeightOffset = spec.Size.Y / 2 + GROUND_CLEARANCE,
+		BobAmplitude = spec.Bob or 0,
+		-- Spreads the bobbing out, so a wave doesn't bounce in step.
+		BobPhase = unit.Id * 1.7,
 		HealthBar = healthBar,
 		HealthFill = healthFill,
 		ShownHealth = 1,
@@ -227,11 +616,8 @@ end
 
 local function showDead(visual: Visual, isDead: boolean)
 	visual.IsShownDead = isDead
-	for _, part in visual.Parts do
-		part.Transparency = if isDead
-			then 1
-			elseif part == visual.Body then visual.BodyTransparency
-			else 0
+	for index, part in visual.Parts do
+		part.Transparency = if isDead then 1 else visual.PartTransparencies[index]
 	end
 	visual.HealthBar.Enabled = visual.HasHealthBar and not isDead
 end
@@ -302,6 +688,7 @@ end
 local function render(deltaTime: number)
 	debug.profilebegin("UnitVisualsClientService:Render")
 	local renderTime = UnitClientService:GetRenderTime()
+	local now = os.clock()
 	table.clear(movedParts)
 	table.clear(movedCFrames)
 
@@ -318,10 +705,13 @@ local function render(deltaTime: number)
 		end
 
 		local position, facing = UnitClientService:GetRenderPose(unit, renderTime)
+		local bob = if visual.BobAmplitude > 0
+			then math.sin(now * BOB_SPEED + visual.BobPhase) * visual.BobAmplitude
+			else 0
 		table.insert(movedParts, visual.Body)
 		table.insert(
 			movedCFrames,
-			CFrame.new(position.X, visual.HeightOffset, position.Z)
+			CFrame.new(position.X, visual.HeightOffset + bob, position.Z)
 				* CFrame.Angles(0, facing, 0)
 				* visual.Rotation
 		)

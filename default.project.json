@@ -14,6 +14,59 @@
         "CharacterAutoLoads": false
       }
     },
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "Technology": { "Enum": 4 },
+        "ClockTime": 14.5,
+        "GeographicLatitude": 25,
+        "Brightness": 2,
+        "ExposureCompensation": 0,
+        "Ambient": { "Color3": [0.06, 0.07, 0.1] },
+        "OutdoorAmbient": { "Color3": [0.22, 0.24, 0.32] },
+        "ColorShift_Top": { "Color3": [0.6, 0.7, 0.95] },
+        "EnvironmentDiffuseScale": 0.4,
+        "EnvironmentSpecularScale": 0,
+        "GlobalShadows": true,
+        "ShadowSoftness": 0.25
+      },
+      "Bloom": {
+        "$className": "BloomEffect",
+        "$properties": {
+          "Enabled": true,
+          "Intensity": 0.6,
+          "Size": 24,
+          "Threshold": 1.3
+        }
+      },
+      "ColorCorrection": {
+        "$className": "ColorCorrectionEffect",
+        "$properties": {
+          "Enabled": true,
+          "Brightness": 0,
+          "Contrast": 0.12,
+          "Saturation": 0.1,
+          "TintColor": { "Color3": [0.93, 0.96, 1] }
+        }
+      },
+      "SunRays": {
+        "$className": "SunRaysEffect",
+        "$properties": {
+          "Enabled": false
+        }
+      },
+      "Atmosphere": {
+        "$className": "Atmosphere",
+        "$properties": {
+          "Density": 0.12,
+          "Offset": 0.1,
+          "Color": { "Color3": [0.36, 0.42, 0.6] },
+          "Decay": { "Color3": [0.15, 0.2, 0.32] },
+          "Glare": 0,
+          "Haze": 0.6
+        }
+      }
+    },
     "ServerScriptService": {
       "$className": "ServerScriptService",
       "$path": "src/ServerScriptService"

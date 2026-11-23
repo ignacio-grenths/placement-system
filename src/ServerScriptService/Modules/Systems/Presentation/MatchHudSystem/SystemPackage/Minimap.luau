@@ -8,9 +8,10 @@ const read = Vide.read
 
 const HudTheme = require("./HudTheme")
 
-const GROUND_COLOR = Color3.fromRGB(46, 66, 46)
-const LANE_COLOR = Color3.fromRGB(150, 135, 105)
-const RIVER_COLOR = Color3.fromRGB(60, 105, 150)
+-- The arena's own palette: dark metal floor, lit roads, an energy river.
+const GROUND_COLOR = Color3.fromRGB(14, 20, 34)
+const LANE_COLOR = Color3.fromRGB(70, 95, 135)
+const RIVER_COLOR = Color3.fromRGB(20, 110, 170)
 const LANE_THICKNESS = 5
 const RIVER_THICKNESS = 12
 
