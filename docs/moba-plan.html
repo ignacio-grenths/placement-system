@@ -71,14 +71,14 @@ Summoner spells | Two per hero, picked before a match, on D and F
 Resources | Each hero runs on one of mana, energy, stamina, or cooldowns only
 Fairness | Every hero has the same power budget and a clear weakness. Bot-vs-bot matches check that no hero wins more than 55%
 Camera | Locked on your hero. On PC a key toggles edge panning, and Space recenters
-Vision | Everything visible in milestone 1. Fog of war and bushes in milestone 2. Wards later
+Vision | Everything visible in milestone 1. Fog of war, bushes, and Sensor Wards in milestone 2
 Servers | One place with two modes: public servers run the lobby, and reserved servers run matches
 Friends | Your Roblox friends in the lobby, parties of up to 5 that queue together
 Ranked | Later, with a hidden skill rating and visible themed tiers
 Leavers | A bot takes over at once, and the player gets their hero back if they rejoin
 Lobby | A full-screen menu client in our own style, not a 3D hub
 Map theme | A valley where an alien mothership crashed
-Art | Placeholder models now. Final models drop in later
+Art | Heroes are anime-style figures built in code from parts (big eyes, hair, outfits, gear) and animated procedurally, so no uploads are needed. Aliens, towers, and monsters stay styled stand-ins
 Money | All heroes free. Cosmetics later, plus a Robux bundle that unlocks every rune early. Runes stay small sidegrades, and every one can be earned by playing
 </rk-table>
 
@@ -357,8 +357,8 @@ MatchServer -> MatchServer: waits up to 30 s, bots take any no-shows
 ID | Item | System | Milestone | Status
 MB-1 | Crashpoint Valley drawn on each client from the `MapLayout` data module every system reads, as a violet alien planet: terrain ground painted cell by cell (violet dust and lavender drifts by the lanes, dark soil with teal moss in the jungle, teal grass under brush), jungle walls as rock ridges with teal crystals, a rock rim around the arena, hills, crater rims, crystal spires, and glowing mushrooms beyond it, brush as alien fronds with glowing bulbs, a teal glass river, lanes lit blue on Blue's half and red on Red's, a neon crash ring, glowing camp and launch pads, and crashed-mothership wreckage. Lighting (Future, bloom, purple color grade and haze) lives in `default.project.json` | MapSystem | M1 | [done]
 MB-2 | Unit records, server tick, damage, death, unit spacing, and 20 jungle walls: units find their way around them (straight lines when nothing is in the way, A* over the walls' corners when something is), and anything shoved or dashed into one is put back outside | UnitSystem | M1 | [done]
-MB-3 | Snapshot stream at 15 per second, client smoothing, health bars, and styled stand-in models built from primitives: hover-suit heroes, bobbing aliens with glowing eyes, crystal-topped tower pylons, energy-field gates, glass cores, and monsters on rings in their camp's color | UnitVisualsSystem | M1 | [done]
-MB-4 | Right-click move and attack, S to stop, tap to move, gamepad stick, QWER quick cast, D and F, B to recall. Roblox's thumbstick is off, since heroes walk by tapping | HeroControlSystem, AbilitySystem | M1 | [done]
+MB-3 | Snapshot stream at 15 per second, client smoothing, health bars, and styled stand-in models built from primitives (heroes became anime figures in MB-37): bobbing aliens with glowing eyes, crystal-topped tower pylons, energy-field gates, glass cores, and monsters on rings in their camp's color | UnitVisualsSystem | M1 | [done]
+MB-4 | Right-click move and attack, S to stop, tap to move, gamepad stick, QWER quick cast, D and F, T to ward, B to recall. Roblox's thumbstick is off, since heroes walk by tapping | HeroControlSystem, AbilitySystem | M1 | [done]
 MB-5 | Locked overhead camera, Y toggles edge panning on PC, Space to recenter, wheel to zoom | CameraSystem | M1 | [done]
 MB-6 | Cooldowns, skillshots, dashes, channels, shields, stuns, roots, slows, and buffs, with every number in `AbilityCatalog` | AbilitySystem | M1 | [done]
 MB-7 | Haru and Ryuka with full kits | AbilitySystem | M1 | [done]
@@ -379,6 +379,8 @@ MB-19 | Fog of war: each team sees around its heroes, aliens, towers, and summon
 MB-20 | Full shop: the four item pairs and their bonuses (Wrecking Crew, Bounty Hunter, Last Stand, Spellstrike; the first pair completed stays active), the four standalone items with their passives, Swift Boots as an upgrade, critical hits and shield power as new stats, and a suggested build per hero tagged in the shop | ItemShopSystem | M2 | [done]
 MB-33 | Bot-vs-bot balance runs: a `BalanceRunSpeed` attribute on Workspace makes a playtest an all-bot match on a simulation clock (12 times as fast), with random heroes per role and a `[BalanceRun]` report per match that `BalanceReport` sums. Bots now earn gold and buy their suggested builds. The first runs fixed mid bots stuck behind their core and junglers idling in fog, then cut structure health 20% (matches went from 31 minutes on average to about 20) and added a 30% bonus to shared experience. With one hero per role, both teams field the same heroes, so per-hero win rates wait for the second hero in each role | BalanceSystem | M2 | [done]
 MB-21 | Bots play all five kits, and group up for the river bosses: the jungle, mid, and support bots gather once they are healthy and leveled (6 for the Skyray, 11 for the Hive Queen), then take the boss together | BotSystem | M2 | [done]
+MB-36 | Sensor Wards: a free trinket on T (D-pad up on gamepad) places a ward that gives its team 30 studs of sight for 90 seconds, two per hero (a third replaces the oldest). Aliens, towers, summons, idle heroes, and area abilities leave wards alone; a hero clears one by attacking it on purpose for 30 gold | AbilitySystem, VisionSystem | M2 | [done]
+MB-37 | Anime hero figures: each hero, Haru's clone, and the shadow knights are jointed figures from `CharacterLookCatalog` (Haru's ponytail, mask, and scarf; Ryuka's glowing twin tails and ki gauntlets; Torvik's eyepatch and curved blades; Seo Dan's crown and mantle; Brakk's mohawk and stone fists). They walk with a stride tied to movement, breathe while idle, and slash, punch, or shoot on each attack, drawn 35% larger than their footprint | UnitVisualsSystem | M2 | [done]
 MB-22 | Lobby or match mode from reserved-server data | ServerModeSystem | M3 | [todo]
 MB-23 | Title screen and menu client with stories | LobbySystem | M3 | [todo]
 MB-24 | Roblox friends list, invites, parties of up to 5 | PartySystem | M3 | [todo]
