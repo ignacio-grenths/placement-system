@@ -7,8 +7,9 @@ const UnitTypes = require(
 type UnitStats = UnitTypes.UnitStats
 
 export type VisualShape = "Ball" | "Block" | "Cylinder"
--- Keep in sync with VisualStyle in UnitVisualsClientService.
-export type VisualStyle = "Plain" | "Hero" | "Alien" | "Tower" | "Gate" | "Core" | "Beast"
+-- Keep in sync with VisualStyle in UnitVisualsClientService, less Rig, which
+-- takes a look from CharacterLookCatalog.
+export type VisualStyle = "Plain" | "Alien" | "Tower" | "Gate" | "Core" | "Beast"
 
 export type UnitEntry = {
 	DisplayName: string,

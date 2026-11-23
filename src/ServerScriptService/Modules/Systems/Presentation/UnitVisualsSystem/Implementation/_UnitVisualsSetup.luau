@@ -1,14 +1,17 @@
 --!strict
 
+const CharacterLookCatalog = require("@game/ServerScriptService/Modules/Data/CharacterLookCatalog")
 const HeroCatalog = require("@game/ServerScriptService/Modules/Data/HeroCatalog")
 const UnitCatalog = require("@game/ServerScriptService/Modules/Data/UnitCatalog")
 
 const UnitVisualsClientService = require("../SystemPackage/UnitVisualsClientService")
 
--- Every hero wears the same hover-suit in its own color until its model
--- exists.
-const HERO_SIZE = Vector3.new(2.6, 5, 2.6)
-const HERO_BOB = 0.1
+-- Figures are drawn larger than their footprint, so they read from the
+-- overhead camera.
+const FIGURE_SCALE = 1.35
+-- The box clicks land on around a figure of scale 1, tall enough to hold its
+-- hair under the health bar.
+const FIGURE_SIZE = Vector3.new(2.6, 5.6, 2.6)
 const CLONE_TRANSPARENCY = 0.5
 const SHADOW_COLOR = Color3.fromRGB(95, 60, 175)
 const SHADOW_TRANSPARENCY = 0.2
@@ -23,28 +26,51 @@ const RINGED_STYLES: { [UnitCatalog.VisualStyle]: boolean? } = {
 	Core = true,
 }
 
+const CharacterRig = require("../SystemPackage/CharacterRig")
+
+type RigSpec = CharacterRig.RigSpec
+
 local Module = {}
+
+--[[
+	Returns the look for a figure at the size it is drawn, or nil with a
+	warning when the catalog has none.
+]]
+local function getLook(lookId: string): RigSpec?
+	local look = CharacterLookCatalog.Looks[lookId]
+	if not look then
+		warn(`CharacterLookCatalog has no look for {lookId}`)
+		return nil
+	end
+	local drawn = table.clone(look)
+	drawn.Scale = (look.Scale or 1) * FIGURE_SCALE
+	return drawn
+end
+
+local function getFigureSize(look: RigSpec?): Vector3
+	return FIGURE_SIZE * (if look then look.Scale or 1 else 1)
+end
 
 function Module:Init()
 	for heroId, hero in HeroCatalog.Heroes do
+		local look = getLook(heroId)
 		UnitVisualsClientService:RegisterVisual(heroId, {
 			Shape = "Block",
-			Size = HERO_SIZE,
-			Color = hero.Color,
-			Style = "Hero",
+			Size = getFigureSize(look),
+			Style = "Rig",
+			Rig = look,
 			HasTeamRing = true,
-			Bob = HERO_BOB,
 			ProjectileSpeed = hero.Stats.ProjectileSpeed,
 		})
 	end
 
 	-- Haru's Echo Clone looks like a see-through Haru.
+	local haruLook = getLook("Haru")
 	UnitVisualsClientService:RegisterVisual("HaruClone", {
 		Shape = "Block",
-		Size = HERO_SIZE,
-		Color = HeroCatalog.Heroes.Haru.Color,
-		Style = "Hero",
-		Bob = HERO_BOB,
+		Size = getFigureSize(haruLook),
+		Style = "Rig",
+		Rig = haruLook,
 		Transparency = CLONE_TRANSPARENCY,
 		HidesHealthBar = true,
 	})
@@ -59,13 +85,13 @@ function Module:Init()
 		Bob = SOLDIER_BOB,
 		Transparency = SHADOW_TRANSPARENCY,
 	})
+	local knightLook = getLook("ShadowKnight")
 	UnitVisualsClientService:RegisterVisual("ShadowKnight", {
 		Shape = "Block",
-		Size = HERO_SIZE,
-		Color = SHADOW_COLOR,
-		Style = "Hero",
+		Size = getFigureSize(knightLook),
+		Style = "Rig",
+		Rig = knightLook,
 		HasTeamRing = true,
-		Bob = HERO_BOB,
 		Transparency = SHADOW_TRANSPARENCY,
 	})
 

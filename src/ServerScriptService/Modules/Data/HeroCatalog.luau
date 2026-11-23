@@ -37,7 +37,7 @@ export type HeroEntry = {
 		AttackDamage: number,
 		MaxResource: number,
 	},
-	-- Placeholder body color until the hero's model exists.
+	-- The hero's signature color. Its look is in CharacterLookCatalog.
 	Color: Color3,
 	SummonerSpells: { SummonerSpell },
 	-- ItemCatalog ids the shop marks as suggested for this hero, built
