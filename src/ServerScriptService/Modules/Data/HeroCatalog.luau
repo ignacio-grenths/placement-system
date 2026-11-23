@@ -235,6 +235,33 @@ Module.Heroes = {
 		SummonerSpells = { "Blink", "Hunt" },
 		SuggestedBuild = { "SwiftBoots", "EchoBlade", "GrubHammer", "VoidShard" },
 	},
+	-- Range and control, paid for with the weakest attacks and frame.
+	Yuki = {
+		DisplayName = "Yuki",
+		Title = "the Frost Witch",
+		Role = "Mid",
+		Resource = "Mana",
+		MaxResource = 360,
+		ResourceRegen = 4.5,
+		ResourceRegenDelay = 0,
+		ResourceOnHeroHit = 0,
+		Abilities = { Q = "Yuki.Q", W = "Yuki.W", E = "Yuki.E", R = "Yuki.R" },
+		Stats = {
+			MaxHealth = 530,
+			Armor = 21,
+			AttackDamage = 52,
+			AttackRange = 14,
+			AttackInterval = 1.6,
+			MoveSpeed = 15.5,
+			Radius = 1.3,
+			ProjectileSpeed = 60,
+		},
+		Color = Color3.fromRGB(150, 215, 255),
+		SkillOrder = { "Q", "W", "E" },
+		Growth = { MaxHealth = 78, Armor = 2.8, AttackDamage = 2.6, MaxResource = 32 },
+		SummonerSpells = { "Blink", "Scorch" },
+		SuggestedBuild = { "SwiftBoots", "KiConduit", "VoidShard", "StarfallPendant" },
+	},
 } :: { [string]: HeroEntry }
 
 return Module

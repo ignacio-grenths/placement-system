@@ -14,6 +14,7 @@ const SeoDanKit = require("@self/_SeoDanKit")
 const SummonerSpells = require("@self/_SummonerSpells")
 const TorvikKit = require("@self/_TorvikKit")
 const Trinkets = require("@self/_Trinkets")
+const YukiKit = require("@self/_YukiKit")
 
 const KITS = {
 	HaruKit,
@@ -23,6 +24,7 @@ const KITS = {
 	BrakkKit,
 	AkaneKit,
 	RinKit,
+	YukiKit,
 	SummonerSpells,
 	Trinkets,
 	Recall,

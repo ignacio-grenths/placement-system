@@ -802,6 +802,106 @@ local function rin(): RigSpec
 	}
 end
 
+-- The Frost Witch: a wide witch hat with a drooping tip and a glowing gem,
+-- long pale hair down her back, a long robe trimmed in white, and a staff
+-- topped with an ice crystal.
+local function yuki(): RigSpec
+	local hair = Color3.fromRGB(222, 228, 255)
+	local hat = Color3.fromRGB(32, 42, 96)
+	local robe = Color3.fromRGB(44, 64, 128)
+	local trim = Color3.fromRGB(240, 244, 255)
+	local ice = Color3.fromRGB(160, 225, 255)
+	local sideLock = lock(hair, Vector3.new(-0.72, 0.3, -0.1), Vector3.new(-0.78, -0.9, -0.3), 0.36)
+	local head: { PartPlan } = {
+		hairCap(hair),
+		lock(hair, Vector3.new(-0.34, 0.7, -0.38), Vector3.new(-0.48, 0.24, -0.84), 0.36),
+		lock(hair, Vector3.new(0.04, 0.72, -0.4), Vector3.new(0.08, 0.18, -0.86), 0.36),
+		lock(hair, Vector3.new(0.36, 0.7, -0.38), Vector3.new(0.52, 0.24, -0.84), 0.34),
+		sideLock,
+		mirrored(sideLock),
+		lock(hair, Vector3.new(0, 0.1, 0.62), Vector3.new(0, -1.5, 0.8), 1),
+		{
+			Shape = "Cylinder",
+			Size = Vector3.new(2.3, 0.1, 2.3),
+			Offset = CFrame.new(0, 0.62, 0.04) * CFrame.Angles(-0.12, 0, 0),
+			Color = hat,
+		},
+		lock(hat, Vector3.new(0, 2.38, 0.55), Vector3.new(0, 2.55, 1.1), 0.24),
+		glowing({
+			Shape = "Ball",
+			Size = Vector3.one * 0.26,
+			Offset = CFrame.new(0, 0.9, -0.6),
+			Color = ice,
+		}),
+	}
+	-- The hat's cone is stacked rings, narrower and leaning further back
+	-- toward the top, so it comes to a point.
+	for step = 0, 4 do
+		local width = 1.25 - step * 0.22
+		table.insert(head, {
+			Shape = "Cylinder",
+			Size = Vector3.new(width, 0.4, width),
+			Offset = CFrame.new(0, 0.8 + step * 0.36, 0.08 + step * 0.1)
+				* CFrame.Angles(-0.12 - step * 0.05, 0, 0),
+			Color = hat,
+		})
+	end
+	local torso: { PartPlan } = {
+		{
+			Shape = "Block",
+			Size = Vector3.new(1.7, 1.5, 1),
+			Offset = CFrame.new(0, -1.4, 0),
+			Color = robe,
+			Material = Enum.Material.Fabric,
+		},
+		{
+			Shape = "Block",
+			Size = Vector3.new(1.74, 0.16, 1.04),
+			Offset = CFrame.new(0, -2.1, 0),
+			Color = trim,
+		},
+		{
+			Shape = "Ellipsoid",
+			Size = Vector3.new(1.5, 0.36, 1),
+			Offset = CFrame.new(0, 0.82, 0),
+			Color = trim,
+			Material = Enum.Material.Fabric,
+		},
+		belt(Color3.fromRGB(26, 34, 76)),
+	}
+	local cuff: PartPlan = {
+		Shape = "Block",
+		Size = Vector3.new(0.58, 0.2, 0.58),
+		Offset = CFrame.new(0, -0.58, 0),
+		Color = trim,
+	}
+	local staff: { PartPlan } = {
+		cuff,
+		{
+			Shape = "Block",
+			Size = Vector3.new(0.12, 3.2, 0.12),
+			Offset = CFrame.new(0, -0.4, -0.25),
+			Color = Color3.fromRGB(70, 82, 120),
+		},
+		glowing(lock(ice, Vector3.new(0, 1.15, -0.25), Vector3.new(0, 1.8, -0.25), 0.4)),
+	}
+	return {
+		SkinColor = Color3.fromRGB(252, 232, 222),
+		HairColor = hair,
+		EyeColor = Color3.fromRGB(90, 170, 255),
+		TopColor = robe,
+		BottomColor = Color3.fromRGB(30, 36, 70),
+		ShoeColor = Color3.fromRGB(26, 30, 58),
+		AttackMotion = "Shoot",
+		Attachments = {
+			Head = head,
+			Torso = torso,
+			LeftArm = { cuff },
+			RightArm = staff,
+		},
+	}
+end
+
 -- One of Seo Dan's shadow knights: a closed helmet with a glowing visor and
 -- crest, dark plate armor, and a violet-edged blade like Seo Dan's.
 local function shadowKnight(): RigSpec
@@ -874,6 +974,7 @@ Module.Looks = {
 	Brakk = brakk(),
 	Akane = akane(),
 	Rin = rin(),
+	Yuki = yuki(),
 	ShadowKnight = shadowKnight(),
 } :: { [string]: RigSpec? }
 

@@ -42,6 +42,8 @@ const CAST_MOTIONS: { [string]: Motion? } = {
 	["Akane.R"] = "Punch",
 	["Rin.Q"] = "Slash",
 	["Rin.R"] = "Raise",
+	["Yuki.W"] = "Raise",
+	["Yuki.R"] = "Raise",
 	["Spell.Warp"] = "Raise",
 }
 
