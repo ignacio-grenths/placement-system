@@ -1,7 +1,6 @@
 --!strict
 
-const RunService = game:GetService("RunService")
-
+const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -33,7 +32,7 @@ local damageRevealSeconds = 0
 -- By team: the other teams' units it sees, rebuilt every step.
 local seenUnits: { [Team]: { [Unit]: boolean? } } = { Blue = {}, Red = {} }
 local viewersByTeam: { [Team]: { Viewer } } = { Blue = {}, Red = {} }
--- By unit, then by team: the os.clock() time a reveal ends.
+-- By unit, then by team: the SimClock time a reveal ends.
 local reveals: { [Unit]: { [Team]: number? }? } = {}
 local playerTeams: { [Player]: Team? } = {}
 local stepTimer = 0
@@ -45,7 +44,7 @@ local function isRevealed(unit: Unit, team: Team, now: number): boolean
 end
 
 local function rebuild()
-	local now = os.clock()
+	local now = SimClock.now()
 	local units = UnitServerService:GetUnits()
 	local unitBrushes: { [Unit]: number? } = {}
 	table.clear(playerTeams)
@@ -159,7 +158,7 @@ end
 function Module:Reveal(unit: Unit, team: Team, seconds: number)
 	local byTeam: { [Team]: number? } = reveals[unit] or {}
 	reveals[unit] = byTeam
-	local endsAt = os.clock() + seconds
+	local endsAt = SimClock.now() + seconds
 	byTeam[team] = math.max(byTeam[team] or 0, endsAt)
 
 	local seen = seenUnits[team]
@@ -194,7 +193,7 @@ function Module:Init()
 end
 
 function Module:Start()
-	RunService.Heartbeat:Connect(onHeartbeat)
+	SimClock.onStep(onHeartbeat)
 end
 
 return Module

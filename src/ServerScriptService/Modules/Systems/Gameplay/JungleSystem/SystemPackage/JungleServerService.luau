@@ -1,8 +1,7 @@
 --!strict
 
-const RunService = game:GetService("RunService")
-
 const Signal = require("@game/ServerScriptService/Modules/Utilities/Signal")
+const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -165,7 +164,7 @@ end
 
 local function getElapsed(): number?
 	local startTime = matchStartTime
-	return if startTime then workspace:GetServerTimeNow() - startTime else nil
+	return if startTime then SimClock.serverTime() - startTime else nil
 end
 
 local function onUnitDamaged(target: Unit, source: Unit?)
@@ -253,7 +252,7 @@ end
 
 --[[
 	Clears every camp and starts spawning them on a match clock that starts
-	at a server time (workspace:GetServerTimeNow()).
+	at a server time (SimClock.serverTime()).
 ]]
 function Module:Begin(startTime: number)
 	removeMonsters()
@@ -273,7 +272,7 @@ function Module:Init()
 end
 
 function Module:Start()
-	RunService.Heartbeat:Connect(step)
+	SimClock.onStep(step)
 end
 
 return Module

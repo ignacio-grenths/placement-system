@@ -1,7 +1,5 @@
 --!strict
 
-const RunService = game:GetService("RunService")
-
 const AbilityCatalog = require("@game/ServerScriptService/Modules/Data/AbilityCatalog")
 const AbilityRules = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/AbilitySystem/SystemPackage/AbilityRules"
@@ -20,6 +18,7 @@ const MapLayout = require("@game/ServerScriptService/Modules/Data/MapLayout")
 const MatchServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/MatchSystem/SystemPackage/MatchServerService"
 )
+const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -49,7 +48,7 @@ type BossPlan = {
 	BossKey: string,
 	Rally: Vector3,
 	IsFighting: boolean,
-	-- os.clock() time the party stops waiting for stragglers.
+	-- SimClock time the party stops waiting for stragglers.
 	GatherDeadline: number,
 }
 
@@ -135,7 +134,7 @@ local function updatePlan(team: MapLayout.MapTeam)
 		if #JungleServerService:GetCampMonsters(plan.BossKey) == 0 or #party < MIN_FIGHTERS then
 			plans[team] = nil
 		elseif not plan.IsFighting then
-			plan.IsFighting = isGathered(party, plan.Rally) or os.clock() >= plan.GatherDeadline
+			plan.IsFighting = isGathered(party, plan.Rally) or SimClock.now() >= plan.GatherDeadline
 		end
 		return
 	end
@@ -161,7 +160,7 @@ local function updatePlan(team: MapLayout.MapTeam)
 				BossKey = boss.Key,
 				Rally = position + (home - position).Unit * RALLY_DISTANCE,
 				IsFighting = false,
-				GatherDeadline = os.clock() + GATHER_SECONDS,
+				GatherDeadline = SimClock.now() + GATHER_SECONDS,
 			}
 			return
 		end
@@ -285,7 +284,7 @@ function Module:Init()
 end
 
 function Module:Start()
-	RunService.Heartbeat:Connect(onHeartbeat)
+	SimClock.onStep(onHeartbeat)
 end
 
 return Module

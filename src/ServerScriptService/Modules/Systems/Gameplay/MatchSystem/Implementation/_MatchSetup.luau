@@ -4,9 +4,8 @@ const HeroCatalog = require("@game/ServerScriptService/Modules/Data/HeroCatalog"
 
 const MatchServerService = require("../SystemPackage/MatchServerService")
 
--- Milestone 1 ships two heroes with kits for players. Bots play every role,
--- the other three heroes with basic attacks only until milestone 2.
-const HERO_POOL = { "Haru", "Ryuka" }
+-- Heroes players are handed, in order, each in its own role.
+const HERO_POOL = { "Haru", "Ryuka", "Torvik", "SeoDan", "Brakk" }
 
 const MatchTypes = require("../SystemPackage/MatchTypes")
 

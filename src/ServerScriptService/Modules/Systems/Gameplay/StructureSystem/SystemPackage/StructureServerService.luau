@@ -1,6 +1,7 @@
 --!strict
 
 const Signal = require("@game/ServerScriptService/Modules/Utilities/Signal")
+const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -67,7 +68,7 @@ local function refreshExposure()
 end
 
 local function towerBrain(tower: Unit)
-	local now = os.clock()
+	local now = SimClock.now()
 	local reach = tower.Stats.AttackRange + tower.Stats.Radius
 	-- Towers leave jungle monsters to the heroes who pulled them.
 	local enemies = UnitServerService:FindInRadius(tower.Position, reach, function(other)
@@ -132,7 +133,7 @@ local function onUnitDied(unit: Unit)
 
 	if definition.Tier == "Gate" and lane then
 		Module.GateDestroyed:Fire(definition.Team, lane)
-		task.delay(GATE_REBUILD_DELAY, rebuildGate, definition, lane)
+		SimClock.delay(GATE_REBUILD_DELAY, rebuildGate, definition, lane)
 	elseif definition.Tier == "Core" then
 		Module.CoreDestroyed:Fire(definition.Team)
 	end
@@ -146,7 +147,7 @@ local function onUnitDamaged(target: Unit, source: Unit?)
 		and target.Kind == "Hero"
 		and source.Team ~= target.Team
 	then
-		lastAggressionTimes[source.Id] = os.clock()
+		lastAggressionTimes[source.Id] = SimClock.now()
 	end
 end
 

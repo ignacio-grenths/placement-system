@@ -1,6 +1,7 @@
 --!strict
 
 const Signal = require("@game/ServerScriptService/Modules/Utilities/Signal")
+const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -70,7 +71,7 @@ local function twinFangs(context: CastContext): boolean
 			finish()
 		end
 	end)
-	task.delay(values.Duration, finish)
+	SimClock.delay(values.Duration, finish)
 	ring(torvik.Position, CAST_RING_RADIUS)
 	return true
 end
@@ -113,7 +114,7 @@ local function parry(context: CastContext): boolean
 			Duration = FLASH_DURATION,
 		})
 	end)
-	task.delay(values.Window, finish)
+	SimClock.delay(values.Window, finish)
 	ring(torvik.Position, SMALL_RING_RADIUS, values.Window)
 	return true
 end
@@ -154,13 +155,13 @@ local function berserkFlurry(context: CastContext): boolean
 		Multiply = values.MoveSpeedMultiplier,
 	}, values.Duration)
 
-	local endsAt = os.clock() + values.Duration
+	local endsAt = SimClock.now() + values.Duration
 	local connection = UnitServerService.UnitDamaged:Connect(function(target, source, dealt)
-		if source == torvik and target.Team ~= torvik.Team and os.clock() < endsAt then
+		if source == torvik and target.Team ~= torvik.Team and SimClock.now() < endsAt then
 			UnitServerService:Heal(torvik, dealt * values.Lifesteal)
 		end
 	end)
-	task.delay(values.Duration, function()
+	SimClock.delay(values.Duration, function()
 		connection:Disconnect()
 	end)
 	ring(torvik.Position, CAST_RING_RADIUS, values.Duration)

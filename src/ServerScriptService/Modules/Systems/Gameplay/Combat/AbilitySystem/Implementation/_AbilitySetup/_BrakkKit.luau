@@ -1,5 +1,6 @@
 --!strict
 
+const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -123,8 +124,8 @@ local function colossusForm(context: CastContext): boolean
 	ring(brakk.Position, values.AuraRadius, duration)
 
 	task.spawn(function()
-		local endsAt = os.clock() + duration
-		while os.clock() < endsAt and not brakk.IsDead and not brakk.IsRemoved do
+		local endsAt = SimClock.now() + duration
+		while SimClock.now() < endsAt and not brakk.IsDead and not brakk.IsRemoved do
 			slowAround(
 				brakk,
 				brakk.Position,
@@ -132,7 +133,7 @@ local function colossusForm(context: CastContext): boolean
 				values.AuraSlowMultiplier,
 				AURA_SLOW_SECONDS
 			)
-			task.wait(AURA_INTERVAL)
+			SimClock.wait(AURA_INTERVAL)
 		end
 		UnitServerService:SetEnlarged(brakk, false)
 	end)

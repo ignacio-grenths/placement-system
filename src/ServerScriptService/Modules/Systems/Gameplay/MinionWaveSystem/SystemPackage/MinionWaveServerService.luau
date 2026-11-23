@@ -1,8 +1,7 @@
 --!strict
 
-const RunService = game:GetService("RunService")
-
 const Signal = require("@game/ServerScriptService/Modules/Utilities/Signal")
+const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -149,7 +148,7 @@ local function spawnWave(waveNumber: number)
 	for _, lane in lanes do
 		local isEnemyGateDown = superLaneKeys[getLaneKey(lane.Team, lane.Name)] == true
 		for index, role in MinionWaveRules.getComposition(waveNumber, isEnemyGateDown) do
-			task.delay((index - 1) * SPAWN_SPACING, spawnMinion, lane, role :: MinionRole)
+			SimClock.delay((index - 1) * SPAWN_SPACING, spawnMinion, lane, role :: MinionRole)
 		end
 	end
 end
@@ -160,8 +159,7 @@ local function step()
 		return
 	end
 
-	local dueCount =
-		MinionWaveRules.getWaveCount(schedule, workspace:GetServerTimeNow() - startTime)
+	local dueCount = MinionWaveRules.getWaveCount(schedule, SimClock.serverTime() - startTime)
 	while spawnedWaveCount < dueCount do
 		spawnedWaveCount += 1
 		spawnWave(spawnedWaveCount)
@@ -210,7 +208,7 @@ end
 
 --[[
 	Starts sending waves on a match clock that starts at a server time
-	(workspace:GetServerTimeNow()).
+	(SimClock.serverTime()).
 ]]
 function Module:Begin(startTime: number)
 	matchStartTime = startTime
@@ -222,7 +220,7 @@ function Module:Stop()
 end
 
 function Module:Start()
-	RunService.Heartbeat:Connect(step)
+	SimClock.onStep(step)
 end
 
 return Module

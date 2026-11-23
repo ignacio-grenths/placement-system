@@ -2,6 +2,7 @@
 
 const RunService = game:GetService("RunService")
 
+const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -54,7 +55,7 @@ type UnitStats = UnitTypes.UnitStats
 type Corpse = {
 	Position: Vector3,
 	Stats: UnitStats,
-	-- os.clock() time it fell.
+	-- SimClock time it fell.
 	Time: number,
 }
 
@@ -154,7 +155,7 @@ local function spawnSoldier(
 	})
 	local soldiers = getSoldiers(master)
 	table.insert(soldiers, soldier)
-	task.delay(seconds, function()
+	SimClock.delay(seconds, function()
 		UnitServerService:RemoveUnit(soldier)
 	end)
 	ring(position, SMALL_RING_RADIUS)
@@ -165,7 +166,7 @@ local function onUnitDied(unit: Unit)
 	if unit.Kind ~= "Minion" and unit.Kind ~= "Monster" then
 		return
 	end
-	local now = os.clock()
+	local now = SimClock.now()
 	table.insert(corpses, {
 		Position = unit.Position,
 		Stats = unit.BaseStats,
@@ -190,7 +191,7 @@ end
 local function shadowRise(context: CastContext): boolean
 	local seoDan = context.Caster
 	local values = context.Values
-	local now = os.clock()
+	local now = SimClock.now()
 
 	-- The newest fallen unit in reach rises first.
 	local chosenIndex: number? = nil

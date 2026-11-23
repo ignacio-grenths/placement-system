@@ -1,7 +1,5 @@
 --!strict
 
-const RunService = game:GetService("RunService")
-
 const AbilityServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/AbilitySystem/SystemPackage/AbilityServerService"
 )
@@ -12,6 +10,7 @@ const JungleCatalog = require("@game/ServerScriptService/Modules/Data/JungleCata
 const MinionWaveServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/MinionWaveSystem/SystemPackage/MinionWaveServerService"
 )
+const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -35,13 +34,13 @@ type Unit = UnitTypes.Unit
 
 type Burn = {
 	Source: Unit,
-	-- os.clock() time the burn stops.
+	-- SimClock time the burn stops.
 	EndsAt: number,
 }
 
 local Module = {}
 
--- os.clock() time each hero's Focus and Burn buffs end.
+-- SimClock time each hero's Focus and Burn buffs end.
 local focusHolders: { [Unit]: number? } = {}
 local burnHolders: { [Unit]: number? } = {}
 local burns: { [Unit]: Burn } = {}
@@ -71,8 +70,8 @@ local function sendBuffs(hero: Unit)
 		return
 	end
 
-	local now = os.clock()
-	local serverNow = workspace:GetServerTimeNow()
+	local now = SimClock.now()
+	local serverNow = SimClock.serverTime()
 	local buffs: { BuffState } = {}
 	local function addTimed(id: string, endsAt: number?)
 		if endsAt and endsAt > now then
@@ -139,13 +138,13 @@ local function grantFocus(hero: Unit)
 		{ Stat = "AbilityHaste", Add = focus.AbilityHaste },
 		focus.Duration
 	)
-	focusHolders[hero] = os.clock() + focus.Duration
+	focusHolders[hero] = SimClock.now() + focus.Duration
 	showBuff(hero, "Focus")
 	sendBuffs(hero)
 end
 
 local function grantBurn(hero: Unit)
-	burnHolders[hero] = os.clock() + JungleCatalog.Burn.Duration
+	burnHolders[hero] = SimClock.now() + JungleCatalog.Burn.Duration
 	showBuff(hero, "Burn")
 	sendBuffs(hero)
 end
@@ -162,7 +161,7 @@ end
 
 local function startHiveCall(team: string)
 	local duration = JungleCatalog.HiveCall.Duration
-	hiveCallEndsAt[team] = os.clock() + duration
+	hiveCallEndsAt[team] = SimClock.now() + duration
 	for _, unit in UnitServerService:GetUnits() do
 		if unit.Kind == "Minion" and unit.Team == team and not unit.IsRemoved then
 			empowerMinion(unit, duration)
@@ -204,7 +203,7 @@ local function onUnitDamaged(target: Unit, source: Unit?, _dealt: number, kind: 
 	if not endsAt then
 		return
 	end
-	local now = os.clock()
+	local now = SimClock.now()
 	if now >= endsAt then
 		burnHolders[source] = nil
 		return
@@ -238,7 +237,7 @@ local function onMinionSpawned(minion: Unit)
 	if not endsAt then
 		return
 	end
-	local remaining = endsAt - os.clock()
+	local remaining = endsAt - SimClock.now()
 	if remaining > 0 then
 		empowerMinion(minion, remaining)
 	else
@@ -261,7 +260,7 @@ local function stepBurns(frameTime: number)
 	end
 	burnTimer -= BURN_TICK
 
-	local now = os.clock()
+	local now = SimClock.now()
 	local damage = JungleCatalog.Burn.DamagePerSecond * BURN_TICK
 	for unit, burn in burns do
 		if unit.IsDead or unit.IsRemoved or now >= burn.EndsAt then
@@ -282,7 +281,7 @@ function Module:Init()
 end
 
 function Module:Start()
-	RunService.Heartbeat:Connect(stepBurns)
+	SimClock.onStep(stepBurns)
 end
 
 return Module

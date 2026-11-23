@@ -1,5 +1,6 @@
 --!strict
 
+const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -94,7 +95,7 @@ local function scorch(context: CastContext): boolean
 	beam(caster.Position, target.Position, HARMFUL_COLOR)
 	task.spawn(function()
 		for _ = 1, values.Duration do
-			task.wait(1)
+			SimClock.wait(1)
 			if target.IsDead or target.IsRemoved then
 				return
 			end

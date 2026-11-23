@@ -1,7 +1,5 @@
 --!strict
 
-const RunService = game:GetService("RunService")
-
 const AbilityServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/AbilitySystem/SystemPackage/AbilityServerService"
 )
@@ -10,6 +8,7 @@ const GoldServerService = require(
 )
 const ItemCatalog = require("@game/ServerScriptService/Modules/Data/ItemCatalog")
 const ProgressionCatalog = require("@game/ServerScriptService/Modules/Data/ProgressionCatalog")
+const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -39,7 +38,7 @@ type Spellstrike = {
 	Slot: Slot,
 	-- Seconds of cooldown the cast started.
 	Cooldown: number,
-	-- os.clock() time the empowered attack is no longer waiting.
+	-- SimClock time the empowered attack is no longer waiting.
 	ExpiresAt: number,
 }
 
@@ -52,11 +51,11 @@ const EFFECTS = ItemCatalog.Effects
 
 local Module = {}
 
--- os.clock() times, by hero: the last fight it was in, and when its
+-- SimClock times, by hero: the last fight it was in, and when its
 -- Starfall Pendant can catch it again.
 local lastCombatTimes: { [Unit]: number? } = {}
 local pendantReadyAt: { [Unit]: number? } = {}
--- os.clock() time each ally can get a Last Stand doubled shield again.
+-- SimClock time each ally can get a Last Stand doubled shield again.
 local lastStandReadyAt: { [Unit]: number? } = {}
 local spellstrikes: { [Unit]: Spellstrike? } = {}
 -- Structures a Wrecking Crew hero hit lately, and who hit them.
@@ -64,13 +63,11 @@ local wreckedStructures: { [Unit]: Wrecking? } = {}
 local cloakTimer = 0
 
 local function holds(hero: Unit, itemId: string): boolean
-	local player = hero.OwnerPlayer
-	return player ~= nil and table.find(ItemShopServerService:GetInventory(player), itemId) ~= nil
+	return ItemShopServerService:Holds(hero, itemId)
 end
 
 local function hasPair(hero: Unit, pairId: string): boolean
-	local player = hero.OwnerPlayer
-	return player ~= nil and ItemShopServerService:GetActivePair(player) == pairId
+	return ItemShopServerService:GetActivePair(hero) == pairId
 end
 
 local function getHealthShare(unit: Unit): number
@@ -82,7 +79,7 @@ local function onTookHit(target: Unit, source: Unit, dealt: number, kind: Damage
 		UnitServerService:ApplyDamage(source, dealt * EFFECTS.CarapaceReflectShare, target, "True")
 	end
 
-	local now = os.clock()
+	local now = SimClock.now()
 	if
 		target.Health > 0
 		and getHealthShare(target) < EFFECTS.PendantThreshold
@@ -102,7 +99,7 @@ local function onLandedHit(target: Unit, source: Unit, dealt: number, kind: Dama
 		return
 	end
 
-	local now = os.clock()
+	local now = SimClock.now()
 	if target.Kind == "Structure" then
 		if holds(source, "GrubHammer") then
 			local extra = dealt * EFFECTS.HammerStructureShare
@@ -136,7 +133,7 @@ local function onAlienHitStructure(target: Unit, source: Unit, dealt: number)
 	if
 		wrecking
 		and wrecking.Hero.Team == source.Team
-		and os.clock() < wrecking.ExpiresAt
+		and SimClock.now() < wrecking.ExpiresAt
 		and not wrecking.Hero.IsDead
 		and (wrecking.Hero.Position - source.Position).Magnitude <= EFFECTS.WreckingRadius
 	then
@@ -148,7 +145,7 @@ local function onUnitDamaged(target: Unit, source: Unit?, dealt: number, kind: D
 	if not source or source.Team == target.Team then
 		return
 	end
-	local now = os.clock()
+	local now = SimClock.now()
 	if target.Kind == "Hero" then
 		lastCombatTimes[target] = now
 		onTookHit(target, source, dealt, kind)
@@ -165,10 +162,9 @@ local function onUnitDied(unit: Unit, killer: Unit?)
 	spellstrikes[unit] = nil
 	wreckedStructures[unit] = nil
 	-- Bounty Hunter: hero takedowns pay more, on top of the usual bounty.
-	local player = if killer then killer.OwnerPlayer else nil
-	if unit.Kind == "Hero" and killer and player and hasPair(killer, "BountyHunter") then
+	if unit.Kind == "Hero" and killer and hasPair(killer, "BountyHunter") then
 		local bonus = ProgressionCatalog.HeroKillGold * (EFFECTS.BountyGoldMultiplier - 1)
-		GoldServerService:AddGold(player, bonus)
+		GoldServerService:AddGold(killer, bonus)
 	end
 end
 
@@ -185,7 +181,7 @@ local function onAbilityCast(unit: Unit, slot: Slot, cooldown: number)
 		spellstrikes[unit] = {
 			Slot = slot,
 			Cooldown = cooldown,
-			ExpiresAt = os.clock() + EFFECTS.SpellstrikeSeconds,
+			ExpiresAt = SimClock.now() + EFFECTS.SpellstrikeSeconds,
 		}
 	end
 end
@@ -198,7 +194,7 @@ local function modifyShield(unit: Unit, strength: number, caster: Unit?): number
 	if not caster or caster == unit or unit.Kind ~= "Hero" or not hasPair(caster, "LastStand") then
 		return strength
 	end
-	local now = os.clock()
+	local now = SimClock.now()
 	if
 		getHealthShare(unit) >= EFFECTS.LastStandThreshold
 		or now < (lastStandReadyAt[unit] or 0)
@@ -232,9 +228,9 @@ local function onHeartbeat(frameTime: number)
 	end
 	cloakTimer = 0
 
-	local now = os.clock()
+	local now = SimClock.now()
 	for _, unit in UnitServerService:GetUnits() do
-		if unit.Kind ~= "Hero" or not unit.OwnerPlayer or unit.IsDead or unit.IsRemoved then
+		if unit.Kind ~= "Hero" or unit.IsDead or unit.IsRemoved then
 			continue
 		end
 		-- Tracker's Cloak: extra speed for a hero who hasn't fought lately.
@@ -262,7 +258,7 @@ function Module:Init()
 end
 
 function Module:Start()
-	RunService.Heartbeat:Connect(onHeartbeat)
+	SimClock.onStep(onHeartbeat)
 end
 
 return Module

@@ -12,7 +12,7 @@ const UnitTypes = require(
 local Module = {}
 
 -- Items can only be bought while standing at your own team's fountain.
-local function isAtFountain(_player: Player, hero: UnitTypes.Unit): boolean
+local function isAtFountain(hero: UnitTypes.Unit): boolean
 	local base = MapLayout.Bases[hero.Team :: MapLayout.MapTeam]
 	return base ~= nil and (hero.Position - base.Fountain).Magnitude <= base.FountainRadius
 end

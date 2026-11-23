@@ -1,9 +1,9 @@
 --!strict
 
 const Players = game:GetService("Players")
-const RunService = game:GetService("RunService")
 
 const Signal = require("@game/ServerScriptService/Modules/Utilities/Signal")
+const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 
 const CombatRules = require("./CombatRules")
 const Navigation = require("./Navigation")
@@ -38,6 +38,10 @@ const MAX_UNIT_ID = 65535
 -- Share of healing a unit still receives while its healing is cut.
 const HEALING_CUT_SHARE = 0.6
 const MOVE_EPOCH_COUNT = 256
+-- Studs a walker keeps from the edge of an obstacle it steers around, and
+-- how far ahead of it, past that, it starts steering.
+const OBSTACLE_MARGIN = 0.5
+const OBSTACLE_LOOKAHEAD = 4
 
 const UnitTypes = require("./UnitTypes")
 
@@ -130,6 +134,8 @@ local lastUnitId = 0
 local snapshotTimer = 0
 local separationTimer = 0
 local navigation: Navigation.Navigation? = nil
+-- Living units that never move, which walkers steer around. Rebuilt each step.
+local obstacles: { Unit } = {}
 local shieldModifier: ((Unit, number, Unit?) -> number)? = nil
 local visibility: Visibility? = nil
 
@@ -234,6 +240,41 @@ local function faceToward(unit: Unit, point: Vector3)
 end
 
 --[[
+	Returns the direction a unit heading along direction should walk to get
+	past any unit that never moves (a tower, a core) standing in its way: along
+	the obstacle's edge, on the side nearer the goal. Without it a unit walking
+	straight at a core stalls there, pushed back as fast as it walks in.
+]]
+local function avoidObstacles(
+	unit: Unit,
+	direction: Vector3,
+	point: Vector3,
+	distance: number
+): Vector3
+	for _, obstacle in obstacles do
+		if obstacle == unit then
+			continue
+		end
+		local clearance = obstacle.Stats.Radius + unit.Stats.Radius + OBSTACLE_MARGIN
+		local toObstacle = obstacle.Position - unit.Position
+		local along = toObstacle:Dot(direction)
+		if along <= 0 or along > math.min(distance, clearance + OBSTACLE_LOOKAHEAD) then
+			continue
+		end
+		-- A goal beside the obstacle, such as attacking it, is walked to.
+		if (point - obstacle.Position).Magnitude <= clearance then
+			continue
+		end
+		local lateral = (toObstacle - direction * along).Magnitude
+		if lateral < clearance then
+			local tangent = Vector3.new(-toObstacle.Z, 0, toObstacle.X).Unit
+			return if tangent:Dot(direction) >= 0 then tangent else -tangent
+		end
+	end
+	return direction
+end
+
+--[[
 	Moves the unit toward the point for one step at the given speed, and
 	returns true once it is within stopDistance of it.
 ]]
@@ -255,8 +296,9 @@ local function moveToward(
 
 	local remaining = distance - stopDistance
 	local stepLength = math.min(speed * dt, remaining)
-	unit.Position += offset / distance * stepLength
-	unit.Facing = math.atan2(-offset.X, -offset.Z)
+	local direction = avoidObstacles(unit, offset / distance, point, distance)
+	unit.Position += direction * stepLength
+	unit.Facing = math.atan2(-direction.X, -direction.Z)
 	return stepLength >= remaining
 end
 
@@ -716,9 +758,16 @@ end
 local function step(frameTime: number)
 	debug.profilebegin("UnitServerService:Step")
 	local dt = math.min(frameTime, MAX_STEP)
-	local now = os.clock()
+	local now = SimClock.now()
 
 	if not isPaused then
+		table.clear(obstacles)
+		for _, unit in unitArray do
+			if unit.BaseStats.MoveSpeed <= 0 and not unit.IsDead and not unit.IsRemoved then
+				table.insert(obstacles, unit)
+			end
+		end
+
 		-- Units spawned during the loop are appended past count and wait
 		-- for the next step.
 		local count = #unitArray
@@ -752,7 +801,7 @@ local function step(frameTime: number)
 end
 
 local function onSyncRequest(player: Player)
-	local now = os.clock()
+	local now = SimClock.now()
 	local lastSyncTime = lastSyncTimes[player]
 	if lastSyncTime and now - lastSyncTime < SYNC_COOLDOWN then
 		return
@@ -811,7 +860,7 @@ function Module:SpawnUnit(options: SpawnOptions): Unit
 		NextPathTime = 0,
 		Brain = options.Brain,
 		-- Spread first thinks out, so a whole wave doesn't think on one frame.
-		NextThinkTime = os.clock() + random:NextNumber(0, THINK_INTERVAL),
+		NextThinkTime = SimClock.now() + random:NextNumber(0, THINK_INTERVAL),
 	}
 
 	unitsById[unit.Id] = unit
@@ -958,7 +1007,7 @@ function Module:SetVisibility(newVisibility: Visibility?)
 end
 
 function Module:IsStunned(unit: Unit): boolean
-	return os.clock() < unit.StunnedUntil
+	return SimClock.now() < unit.StunnedUntil
 end
 
 function Module:IssueOrder(unit: Unit, order: Order)
@@ -975,7 +1024,7 @@ function Module:ApplyDamage(target: Unit, amount: number, source: Unit?, kind: D
 	if target.IsDead or target.IsRemoved or not target.IsTargetable or amount <= 0 then
 		return 0
 	end
-	if kind ~= "True" and target.BlockedHits > 0 and os.clock() < target.BlockUntil then
+	if kind ~= "True" and target.BlockedHits > 0 and SimClock.now() < target.BlockUntil then
 		target.BlockedHits -= 1
 		Module.HitBlocked:Fire(target, source)
 		return 0
@@ -1004,7 +1053,7 @@ function Module:Heal(unit: Unit, amount: number)
 	if unit.IsDead or unit.IsRemoved then
 		return
 	end
-	local share = if os.clock() < unit.HealingCutUntil then HEALING_CUT_SHARE else 1
+	local share = if SimClock.now() < unit.HealingCutUntil then HEALING_CUT_SHARE else 1
 	unit.Health = math.min(unit.Health + amount * share, unit.Stats.MaxHealth)
 end
 
@@ -1048,7 +1097,7 @@ function Module:AddModifier(unit: Unit, key: string, modifier: StatModifier, dur
 	end
 	unit.Modifiers[key] = {
 		Modifier = modifier,
-		ExpiresAt = os.clock() + duration,
+		ExpiresAt = SimClock.now() + duration,
 	}
 	recomputeStats(unit)
 end
@@ -1083,11 +1132,11 @@ function Module:ClearImpairments(unit: Unit)
 end
 
 function Module:GrantCrowdControlImmunity(unit: Unit, duration: number)
-	unit.CrowdControlImmuneUntil = math.max(unit.CrowdControlImmuneUntil, os.clock() + duration)
+	unit.CrowdControlImmuneUntil = math.max(unit.CrowdControlImmuneUntil, SimClock.now() + duration)
 end
 
 function Module:Stun(unit: Unit, duration: number)
-	local now = os.clock()
+	local now = SimClock.now()
 	if now < unit.CrowdControlImmuneUntil or unit.IsDead then
 		return
 	end
@@ -1095,7 +1144,7 @@ function Module:Stun(unit: Unit, duration: number)
 end
 
 function Module:Root(unit: Unit, duration: number, options: RootOptions?)
-	local now = os.clock()
+	local now = SimClock.now()
 	local isSelfApplied = options and options.IsSelfApplied
 	if unit.IsDead or (now < unit.CrowdControlImmuneUntil and not isSelfApplied) then
 		return
@@ -1112,7 +1161,7 @@ function Module:BlockHits(unit: Unit, hits: number, duration: number)
 		return
 	end
 	unit.BlockedHits = hits
-	unit.BlockUntil = os.clock() + duration
+	unit.BlockUntil = SimClock.now() + duration
 end
 
 --[[
@@ -1124,7 +1173,7 @@ function Module:SetEnlarged(unit: Unit, isEnlarged: boolean)
 end
 
 function Module:CutHealing(unit: Unit, duration: number)
-	unit.HealingCutUntil = math.max(unit.HealingCutUntil, os.clock() + duration)
+	unit.HealingCutUntil = math.max(unit.HealingCutUntil, SimClock.now() + duration)
 end
 
 --[[
@@ -1145,7 +1194,7 @@ function Module:AddShield(unit: Unit, amount: number, duration: number, caster: 
 		strength = modify(unit, strength, caster)
 	end
 	unit.Shield += strength
-	unit.ShieldExpiresAt = math.max(unit.ShieldExpiresAt, os.clock() + duration)
+	unit.ShieldExpiresAt = math.max(unit.ShieldExpiresAt, SimClock.now() + duration)
 end
 
 --[[
@@ -1233,7 +1282,7 @@ function Module:Init()
 end
 
 function Module:Start()
-	RunService.Heartbeat:Connect(step)
+	SimClock.onStep(step)
 end
 
 return Module

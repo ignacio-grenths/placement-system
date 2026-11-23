@@ -49,7 +49,7 @@ export type StatModifier = {
 
 export type TimedModifier = {
 	Modifier: StatModifier,
-	-- os.clock() time the modifier ends. math.huge for a permanent one,
+	-- SimClock time the modifier ends. math.huge for a permanent one,
 	-- such as an item's, which survives death.
 	ExpiresAt: number,
 }
@@ -98,10 +98,10 @@ export type Unit = {
 	-- Waypoints around walls toward PathGoal, the last one the goal itself.
 	Path: { Vector3 }?,
 	PathGoal: Vector3?,
-	-- os.clock() time the path is found again, since its goal may move.
+	-- SimClock time the path is found again, since its goal may move.
 	NextPathTime: number,
 	Dash: Dash?,
-	-- os.clock() times that crowd control and its immunity end.
+	-- SimClock times that crowd control and its immunity end.
 	StunnedUntil: number,
 	RootedUntil: number,
 	CrowdControlImmuneUntil: number,

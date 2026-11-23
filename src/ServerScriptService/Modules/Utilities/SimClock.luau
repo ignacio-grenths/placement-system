@@ -1,0 +1,125 @@
+--!strict
+
+const RunService = game:GetService("RunService")
+
+const Signal = require("./Signal")
+
+type Timer = {
+	DueAt: number,
+	Callback: (...any) -> (),
+	Arguments: { any },
+	-- Kept apart from Arguments, since a nil argument would cut #Arguments.
+	ArgumentCount: number,
+}
+
+local Module = {}
+
+-- Fires once per simulation step with the step's length in seconds. At
+-- speed 1 that is once per frame.
+Module.Stepped = Signal.new() :: Signal.Signal<number>
+
+-- Seconds the simulation has run ahead of real time.
+local offset = 0
+local speed = 1
+local timers: { Timer } = {}
+local connection: RBXScriptConnection? = nil
+
+local function runDueTimers()
+	local now = os.clock() + offset
+	local index = 1
+	while index <= #timers do
+		local timer = timers[index]
+		if timer.DueAt <= now then
+			-- Swap-remove: the order timers run in within one step is free.
+			timers[index] = timers[#timers]
+			timers[#timers] = nil
+			task.spawn(timer.Callback, table.unpack(timer.Arguments, 1, timer.ArgumentCount))
+		else
+			index += 1
+		end
+	end
+end
+
+local function onHeartbeat(frameTime: number)
+	for step = 1, speed do
+		if step > 1 then
+			offset += frameTime
+		end
+		runDueTimers()
+		Module.Stepped:Fire(frameTime)
+	end
+end
+
+-- The clock only ticks once a running game uses it, so requiring it in edit
+-- mode (specs, stories, the command bar) connects nothing.
+local function ensureRunning()
+	if not connection and RunService:IsRunning() then
+		connection = RunService.Heartbeat:Connect(onHeartbeat)
+	end
+end
+
+--[[
+	Returns the simulation's time in seconds, for measuring durations the
+	way os.clock() does. At speed 1 it equals os.clock().
+]]
+function Module.now(): number
+	return os.clock() + offset
+end
+
+--[[
+	Returns the simulation's time on the server clock clients share, for
+	times sent to them. At speed 1 it equals workspace:GetServerTimeNow().
+]]
+function Module.serverTime(): number
+	return workspace:GetServerTimeNow() + offset
+end
+
+--[[
+	Runs the simulation this many steps per frame. Above 1, matches play out
+	faster than real time, for balance runs with nobody watching.
+]]
+function Module.setSpeed(stepsPerFrame: number)
+	assert(stepsPerFrame >= 1 and stepsPerFrame % 1 == 0, "Speed must be a whole number from 1")
+	speed = stepsPerFrame
+	ensureRunning()
+end
+
+function Module.getSpeed(): number
+	return speed
+end
+
+--[[
+	Connects a handler to every simulation step, like Heartbeat.
+]]
+function Module.onStep(handler: (frameTime: number) -> ()): Signal.Connection
+	ensureRunning()
+	return Module.Stepped:Connect(handler)
+end
+
+--[[
+	Calls callback with the arguments once the simulation has run for the
+	given seconds, like task.delay.
+]]
+function Module.delay(seconds: number, callback: (...any) -> (), ...: any)
+	ensureRunning()
+	table.insert(timers, {
+		DueAt = Module.now() + seconds,
+		Callback = callback,
+		Arguments = { ... },
+		ArgumentCount = select("#", ...),
+	})
+end
+
+--[[
+	Yields the calling thread until the simulation has run for the given
+	seconds, like task.wait.
+]]
+function Module.wait(seconds: number)
+	local thread = coroutine.running()
+	Module.delay(seconds, function()
+		task.spawn(thread)
+	end)
+	coroutine.yield()
+end
+
+return Module

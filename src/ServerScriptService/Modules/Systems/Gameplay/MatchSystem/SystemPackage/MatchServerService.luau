@@ -4,6 +4,7 @@ const HttpService = game:GetService("HttpService")
 const Players = game:GetService("Players")
 
 const Signal = require("@game/ServerScriptService/Modules/Utilities/Signal")
+const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 
 const MatchNetwork = require("./MatchNetwork")
 
@@ -36,6 +37,8 @@ local botHeroesByRole: { [string]: string? } = {}
 local rolesByHero: { [string]: Role? } = {}
 local heroPool: { string } = {}
 local isFillingWithBots = false
+local isSpectating = false
+local botHeroPicker: ((Team, Role) -> string)? = nil
 local phase: Phase = "Waiting"
 local startTime = 0
 
@@ -150,7 +153,9 @@ local function fillWithBots()
 	for _, team in TEAMS do
 		for _, slotRole in roles do
 			local role: Role = slotRole :: Role
-			local heroId = botHeroesByRole[role]
+			local heroId = if botHeroPicker
+				then botHeroPicker(team :: Team, role)
+				else botHeroesByRole[role]
 			if heroId and not findInRole(team :: Team, role) then
 				addParticipant({
 					Player = nil,
@@ -169,7 +174,7 @@ local function fillWithBots()
 end
 
 local function startMatch()
-	startTime = workspace:GetServerTimeNow() + START_DELAY
+	startTime = SimClock.serverTime() + START_DELAY
 	MatchNetwork.MatchState:SetAttribute("StartTime", startTime)
 	setPhase("Playing")
 	Module.MatchStarted:Fire(startTime)
@@ -177,6 +182,13 @@ end
 
 local function onPlayerAdded(player: Player)
 	if phase == "Ended" or findByPlayer(player) then
+		return
+	end
+	if isSpectating then
+		if phase == "Waiting" then
+			startMatch()
+		end
+		fillWithBots()
 		return
 	end
 
@@ -245,6 +257,30 @@ function Module:SetFillWithBots(isOn: boolean)
 end
 
 --[[
+	Turns on watching: players who join take no slot and get no hero, so
+	every slot plays as a bot. Call it before players join.
+]]
+function Module:SetPlayersSpectate(isOn: boolean)
+	isSpectating = isOn
+end
+
+--[[
+	Sets who chooses each bot's hero, by team and role. Nil goes back to the
+	hero set for the role in SetRoles.
+]]
+function Module:SetBotHeroPicker(pick: ((team: Team, role: Role) -> string)?)
+	botHeroPicker = pick
+end
+
+--[[
+	Returns the match's slots, players and bots alike. Read it; never change
+	it.
+]]
+function Module:GetParticipants(): { Participant }
+	return participants
+end
+
+--[[
 	Records which hero unit a participant plays, so its deaths and kills are
 	counted for it.
 ]]
@@ -261,7 +297,7 @@ end
 	down to the start.
 ]]
 function Module:GetElapsed(): number
-	return workspace:GetServerTimeNow() - startTime
+	return SimClock.serverTime() - startTime
 end
 
 --[[

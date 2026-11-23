@@ -1,9 +1,9 @@
 --!strict
 
 const Players = game:GetService("Players")
-const RunService = game:GetService("RunService")
 
 const Signal = require("@game/ServerScriptService/Modules/Utilities/Signal")
+const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -128,6 +128,7 @@ local skillshots: { Skillshot } = {}
 local buckets: { [Player]: Bucket? } = {}
 
 local function takeToken(player: Player): boolean
+	-- Requests arrive in real time, whatever speed the simulation runs at.
 	local now = os.clock()
 	local bucket: Bucket = buckets[player] or { Tokens = CAST_BURST, LastTime = now }
 	buckets[player] = bucket
@@ -141,9 +142,9 @@ local function takeToken(player: Player): boolean
 	return true
 end
 
--- Clients read times in server time, while this service keeps os.clock().
+-- Clients read times in server time, while this service keeps SimClock time.
 local function toServerTime(clockTime: number): number
-	return workspace:GetServerTimeNow() + (clockTime - os.clock())
+	return SimClock.serverTime() + (clockTime - SimClock.now())
 end
 
 local function getFacingDirection(unit: Unit): Vector3
@@ -270,7 +271,7 @@ local function stepSkillshots(dt: number)
 end
 
 local function step(frameTime: number)
-	local now = os.clock()
+	local now = SimClock.now()
 	stepResources(frameTime, now)
 	stepChannels(now)
 	stepSkillshots(frameTime)
@@ -442,7 +443,7 @@ function Module:Cast(unit: Unit, slot: Slot, aim: Aim?): (boolean, string?)
 	if not state then
 		return false, "NotACaster"
 	end
-	local now = os.clock()
+	local now = SimClock.now()
 	if unit.IsDead or unit.IsRemoved or now < unit.StunnedUntil or unit.Dash then
 		return false, "Disabled"
 	end
@@ -526,7 +527,7 @@ function Module:ReduceCooldown(unit: Unit, slot: Slot, seconds: number)
 	if not state or not endsAt then
 		return
 	end
-	local now = os.clock()
+	local now = SimClock.now()
 	local reduced = math.max(endsAt - seconds, now)
 	state.CooldownEnds[slot] = reduced
 	if unit.OwnerPlayer then
@@ -554,7 +555,7 @@ function Module:StartChannel(unit: Unit, options: ChannelOptions)
 	if options.IsRooted then
 		UnitServerService:Root(unit, options.Duration, { IsSelfApplied = true })
 	end
-	local endsAt = os.clock() + options.Duration
+	local endsAt = SimClock.now() + options.Duration
 	state.Channel = {
 		Options = options,
 		EndsAt = endsAt,
@@ -643,7 +644,7 @@ function Module:Init()
 end
 
 function Module:Start()
-	RunService.Heartbeat:Connect(step)
+	SimClock.onStep(step)
 end
 
 return Module

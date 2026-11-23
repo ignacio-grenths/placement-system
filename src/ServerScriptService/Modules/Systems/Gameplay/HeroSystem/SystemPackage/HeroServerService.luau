@@ -1,6 +1,7 @@
 --!strict
 
 const Signal = require("@game/ServerScriptService/Modules/Utilities/Signal")
+const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -75,7 +76,7 @@ local function onUnitDied(unit: Unit)
 	end
 
 	local delay = if respawnDelayProvider then respawnDelayProvider(unit) else RESPAWN_DELAY
-	task.delay(delay, function()
+	SimClock.delay(delay, function()
 		if not unit.IsRemoved then
 			UnitServerService:Revive(unit, getSpawnPoint(unit.Team))
 		end
@@ -214,7 +215,7 @@ end
 function Module:Start()
 	task.spawn(function()
 		while true do
-			task.wait(FOUNTAIN_TICK)
+			SimClock.wait(FOUNTAIN_TICK)
 			restoreAtFountains()
 		end
 	end)

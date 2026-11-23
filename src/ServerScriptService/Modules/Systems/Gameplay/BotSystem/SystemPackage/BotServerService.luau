@@ -284,8 +284,9 @@ local function playJungle(bot: Unit, jungle: JungleOptions): JungleAction
 	end
 
 	local monster = findWeakestMonster(camp)
-	if not monster then
-		-- The camp is walking home from a leash and can't be hit yet.
+	-- Walk up to a camp still in fog, or one walking home from a leash: an
+	-- attack order on a monster out of sight is dropped at once.
+	if not monster or not UnitServerService:IsVisibleTo(monster, bot.Team) then
 		moveTo(bot, camp.Position)
 		return "Clear"
 	end
@@ -311,7 +312,7 @@ local function playObjective(bot: Unit, objective: Objective, enemyHero: Unit?, 
 	end
 
 	local target = objective.Target
-	if not target then
+	if not target or not UnitServerService:IsVisibleTo(target, bot.Team) then
 		moveTo(bot, objective.Point)
 		return
 	end

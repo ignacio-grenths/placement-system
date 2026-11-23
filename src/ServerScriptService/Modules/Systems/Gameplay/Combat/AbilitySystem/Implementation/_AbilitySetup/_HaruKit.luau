@@ -1,5 +1,6 @@
 --!strict
 
+const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -92,7 +93,7 @@ local function echoClone(context: CastContext): boolean
 		})
 	end)
 
-	task.delay(values.Duration, function()
+	SimClock.delay(values.Duration, function()
 		connection:Disconnect()
 		if clones[haru] == clone then
 			clones[haru] = nil
@@ -135,7 +136,7 @@ local function echoStorm(context: CastContext): boolean
 	local haru = context.Caster
 	local values = context.Values
 	for strike = 1, values.Strikes do
-		task.delay(values.StrikeInterval * strike, function()
+		SimClock.delay(values.StrikeInterval * strike, function()
 			if target.IsDead or target.IsRemoved then
 				return
 			end

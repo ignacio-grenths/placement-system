@@ -3,6 +3,7 @@
 const Players = game:GetService("Players")
 
 const Signal = require("@game/ServerScriptService/Modules/Utilities/Signal")
+const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -106,7 +107,7 @@ local function findProgress(player: Player): Progress?
 end
 
 local function isRequestAllowed(player: Player): boolean
-	local now = os.clock()
+	local now = SimClock.now()
 	local last = lastRequestTimes[player]
 	if last and now - last < 1 / REQUESTS_PER_SECOND then
 		return false

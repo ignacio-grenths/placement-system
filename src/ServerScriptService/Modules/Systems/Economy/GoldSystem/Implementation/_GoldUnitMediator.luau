@@ -17,9 +17,8 @@ local Module = {}
 
 local function payTeam(team: string, amount: number)
 	for _, unit in UnitServerService:GetUnits() do
-		local player = unit.OwnerPlayer
-		if unit.Kind == "Hero" and unit.Team == team and not unit.IsRemoved and player then
-			GoldServerService:AddGold(player, amount)
+		if unit.Kind == "Hero" and unit.Team == team and not unit.IsRemoved then
+			GoldServerService:AddGold(unit, amount)
 		end
 	end
 end
@@ -34,16 +33,15 @@ local function onUnitDied(unit: Unit, killer: Unit?)
 	end
 
 	-- Everything else pays only the hero who landed the last hit.
-	local player = if killer and killer.Kind == "Hero" then killer.OwnerPlayer else nil
-	if not player then
+	if not killer or killer.Kind ~= "Hero" then
 		return
 	end
 	if unit.Kind == "Hero" then
-		GoldServerService:AddGold(player, ProgressionCatalog.HeroKillGold)
+		GoldServerService:AddGold(killer, ProgressionCatalog.HeroKillGold)
 	else
 		local reward = ProgressionCatalog.UnitRewards[unit.TypeId]
 		if reward then
-			GoldServerService:AddGold(player, reward.Gold)
+			GoldServerService:AddGold(killer, reward.Gold)
 		end
 	end
 end
