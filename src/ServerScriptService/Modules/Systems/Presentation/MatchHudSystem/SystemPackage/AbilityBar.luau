@@ -36,6 +36,15 @@ const CHANNEL_FILL = Color3.fromRGB(120, 200, 255)
 -- Text is drawn see-through on buttons that can't cast, as a second cue to
 -- the darker fill and red cost.
 const BLOCKED_TEXT_TRANSPARENCY = 0.45
+const PIP_SIZE = 5
+const PIP_GAP = 3
+const PIP_LIT_COLOR = Color3.fromRGB(255, 215, 90)
+const PIP_DARK_COLOR = Color3.fromRGB(70, 74, 90)
+-- The + badge sits on the button's top-left corner.
+const RANK_UP_SIZE = 26
+const RANK_UP_TEXT_SIZE = 22
+const RANK_UP_COLOR = Color3.fromRGB(255, 215, 90)
+const RANK_UP_TEXT_COLOR = Color3.fromRGB(20, 22, 30)
 const COOLING_NAME_TRANSPARENCY = 0.85
 
 -- Sizes in UI units for a 1080p screen. The HUD's UIScale grows them on
@@ -90,6 +99,12 @@ export type AbilityView = {
 	CooldownDuration: number,
 	-- True while the slot holds no ability yet.
 	IsEmpty: boolean,
+	-- Ranks taken and the most the ability can have. MaxRank is 0 for
+	-- abilities without ranks, like summoner spells.
+	Rank: number,
+	MaxRank: number,
+	-- True when a point can go into this ability now.
+	CanRankUp: boolean,
 }
 
 export type ChannelView = {
@@ -106,6 +121,7 @@ export type AbilityBarProps = {
 	-- direction (y down) whose length is the share of full range, up to 1.
 	-- Nil aim means cast at the nearest fitting target.
 	OnCast: (slot: string, aim: Vector2?) -> (),
+	OnRankUp: (slot: string) -> (),
 }
 
 type ButtonProps = {
@@ -113,6 +129,7 @@ type ButtonProps = {
 	Metrics: () -> Metrics,
 	LayoutOrder: number,
 	OnCast: (slot: string, aim: Vector2?) -> (),
+	OnRankUp: (slot: string) -> (),
 }
 
 local function formatCooldown(remaining: number): string
@@ -143,8 +160,19 @@ local function abilityButton(props: ButtonProps): TextButton
 
 	local function isBlocked(): boolean
 		local view = ability()
-		return view.IsEmpty or not view.CanAfford
+		local isUnlearned = view.MaxRank > 0 and view.Rank == 0
+		return view.IsEmpty or isUnlearned or not view.CanAfford
 	end
+
+	-- One pip per rank the ability can reach, lit up to its current rank.
+	local pips = derive(function()
+		local view = ability()
+		local list = {}
+		for index = 1, view.MaxRank do
+			table.insert(list, index <= view.Rank)
+		end
+		return list
+	end)
 
 	local function getSize(): number
 		return if ability().IsMain then metrics().MainSize else metrics().SmallSize
@@ -209,6 +237,13 @@ local function abilityButton(props: ButtonProps): TextButton
 			TextScaled = true,
 			TextWrapped = true,
 			TextColor3 = TEXT_COLOR,
+
+			-- Without a cap, short names would swell to fill the button.
+			create("UITextSizeConstraint")({
+				MaxTextSize = function()
+					return metrics().NameTextSize
+				end,
+			}),
 			TextTransparency = function()
 				-- The countdown takes the name's place while the ability cools down.
 				if ability().CooldownRemaining > 0 then
@@ -255,6 +290,53 @@ local function abilityButton(props: ButtonProps): TextButton
 				return if ability().CanAfford then COST_COLOR else BLOCKED_COST_COLOR
 			end,
 			ZIndex = 3,
+		}),
+
+		create("Frame")({
+			Name = "RankPips",
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -4),
+			AutomaticSize = Enum.AutomaticSize.XY,
+			ZIndex = 3,
+
+			create("UIListLayout")({
+				FillDirection = Enum.FillDirection.Horizontal,
+				Padding = UDim.new(0, PIP_GAP),
+			}),
+			indexes(pips, function(isLit)
+				return create("Frame")({
+					Size = UDim2.fromOffset(PIP_SIZE, PIP_SIZE),
+					BackgroundColor3 = function()
+						return if isLit() then PIP_LIT_COLOR else PIP_DARK_COLOR
+					end,
+					ZIndex = 3,
+
+					create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+				})
+			end),
+		}),
+
+		-- Pressed to spend a point on this ability. Sized for a thumb.
+		create("TextButton")({
+			Name = "RankUp",
+			Visible = function()
+				return ability().CanRankUp
+			end,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0, 0),
+			Size = UDim2.fromOffset(RANK_UP_SIZE, RANK_UP_SIZE),
+			BackgroundColor3 = RANK_UP_COLOR,
+			Font = LABEL_FONT,
+			Text = "+",
+			TextSize = RANK_UP_TEXT_SIZE,
+			TextColor3 = RANK_UP_TEXT_COLOR,
+			ZIndex = 5,
+			Activated = function()
+				props.OnRankUp(ability().Slot)
+			end,
+
+			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
 		}),
 
 		create("Frame")({
@@ -348,7 +430,7 @@ end
 local function buttonRow(
 	abilities: () -> { AbilityView },
 	metrics: () -> Metrics,
-	onCast: (slot: string, aim: Vector2?) -> (),
+	props: AbilityBarProps,
 	layoutOrder: number
 ): Frame
 	return create("Frame")({
@@ -369,7 +451,8 @@ local function buttonRow(
 				Ability = ability,
 				Metrics = metrics,
 				LayoutOrder = index,
-				OnCast = onCast,
+				OnCast = props.OnCast,
+				OnRankUp = props.OnRankUp,
 			})
 		end),
 	})
@@ -449,7 +532,7 @@ local function abilityBar(props: AbilityBarProps): Frame
 					HorizontalAlignment = Enum.HorizontalAlignment.Right,
 					Padding = UDim.new(0, TOUCH.Gap),
 				}),
-				buttonRow(smallAbilities, metrics, props.OnCast, 1),
+				buttonRow(smallAbilities, metrics, props, 1),
 				create("Frame")({
 					Name = "MainGrid",
 					LayoutOrder = 2,
@@ -467,6 +550,7 @@ local function abilityBar(props: AbilityBarProps): Frame
 							Metrics = metrics,
 							LayoutOrder = index,
 							OnCast = props.OnCast,
+							OnRankUp = props.OnRankUp,
 						})
 					end),
 				}),
@@ -483,8 +567,8 @@ local function abilityBar(props: AbilityBarProps): Frame
 					VerticalAlignment = Enum.VerticalAlignment.Bottom,
 					Padding = UDim.new(0, DESKTOP.Gap * 2),
 				}),
-				buttonRow(mainAbilities, metrics, props.OnCast, 1),
-				buttonRow(smallAbilities, metrics, props.OnCast, 2),
+				buttonRow(mainAbilities, metrics, props, 1),
+				buttonRow(smallAbilities, metrics, props, 2),
 			})
 		end),
 	})

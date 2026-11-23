@@ -195,7 +195,12 @@ local function moveToward(
 end
 
 local function clearCombatState(unit: Unit)
-	table.clear(unit.Modifiers)
+	-- Permanent modifiers (items) outlast death; buffs and slows do not.
+	for key, timed in unit.Modifiers do
+		if timed.ExpiresAt ~= math.huge then
+			unit.Modifiers[key] = nil
+		end
+	end
 	recomputeStats(unit)
 	unit.Shield = 0
 	unit.Dash = nil
@@ -627,7 +632,22 @@ function Module:RemoveUnit(unit: Unit)
 	unitsById[unit.Id] = nil
 	sentStates[unit.Id] = nil
 	hasRemovals = true
-	table.insert(pendingRemoved, unit.Id)
+
+	-- A unit removed in the step it spawned was never announced, so clients
+	-- are told nothing. Sending both would deliver the removal first, and
+	-- the client would keep a ghost of a unit that no longer exists.
+	local unsentIndex: number? = nil
+	for index, info in pendingAdded do
+		if info.Id == unit.Id then
+			unsentIndex = index
+			break
+		end
+	end
+	if unsentIndex then
+		table.remove(pendingAdded, unsentIndex)
+	else
+		table.insert(pendingRemoved, unit.Id)
+	end
 	Module.UnitRemoved:Fire(unit)
 end
 
@@ -725,9 +745,12 @@ function Module:ApplyDamage(target: Unit, amount: number, source: Unit?, kind: D
 		return 0
 	end
 
+	local amplified = if kind == "Ability" and source
+		then CombatRules.amplifyAbilityDamage(amount, source.Stats.AbilityPower)
+		else amount
 	local mitigated = if kind == "True"
-		then amount
-		else CombatRules.mitigateDamage(amount, target.Stats.Armor)
+		then amplified
+		else CombatRules.mitigateDamage(amplified, target.Stats.Armor)
 	local absorbed = math.min(target.Shield, mitigated)
 	target.Shield -= absorbed
 	local healthLoss = math.min(mitigated - absorbed, target.Health)
@@ -751,6 +774,16 @@ end
 
 function Module:SetResource(unit: Unit, amount: number)
 	unit.Resource = math.clamp(amount, 0, unit.MaxResource)
+end
+
+--[[
+	Changes a unit's resource pool, such as on a level up, keeping the same
+	share of it full.
+]]
+function Module:SetMaxResource(unit: Unit, maximum: number)
+	local share = if unit.MaxResource > 0 then unit.Resource / unit.MaxResource else 1
+	unit.MaxResource = math.max(maximum, 0)
+	unit.Resource = unit.MaxResource * share
 end
 
 function Module:RestoreResource(unit: Unit, amount: number)

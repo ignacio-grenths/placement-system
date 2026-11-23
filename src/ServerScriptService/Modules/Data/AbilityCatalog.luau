@@ -15,8 +15,9 @@ export type AbilityEntry = {
 	-- Studs from the caster's edge.
 	Range: number,
 	TargetFilter: AbilityTypes.TargetFilter?,
-	-- Named tuning numbers the ability's handler reads.
-	Values: AbilityTypes.AbilityValues,
+	-- Named tuning numbers the ability's handler reads: one number, or a list
+	-- with one number per rank.
+	Values: AbilityTypes.RankedValues,
 }
 
 local Module = {}
@@ -32,7 +33,7 @@ Module.Abilities = {
 		Cost = 40,
 		Targeting = "Point",
 		Range = 9,
-		Values = { Duration = 5, EchoDamage = 25, EchoRange = 12 },
+		Values = { Duration = 5, EchoDamage = { 25, 40, 55, 70 }, EchoRange = 12 },
 	},
 	["Haru.W"] = {
 		Name = "Spiral Strike",
@@ -41,7 +42,7 @@ Module.Abilities = {
 		Cost = 50,
 		Targeting = "Point",
 		Range = 9,
-		Values = { Damage = 80, Radius = 5, DashSpeed = 55 },
+		Values = { Damage = { 80, 120, 160, 200 }, Radius = 5, DashSpeed = 55 },
 	},
 	["Haru.E"] = {
 		Name = "Leaf Step",
@@ -60,7 +61,12 @@ Module.Abilities = {
 		Targeting = "Unit",
 		Range = 10,
 		TargetFilter = "EnemyUnit",
-		Values = { Strikes = 3, StrikeDamage = 60, StrikeInterval = 0.25, RingRadius = 4 },
+		Values = {
+			Strikes = 3,
+			StrikeDamage = { 60, 90, 120 },
+			StrikeInterval = 0.25,
+			RingRadius = 4,
+		},
 	},
 	["Ryuka.Q"] = {
 		Name = "Ki Volley",
@@ -69,7 +75,7 @@ Module.Abilities = {
 		Cost = 50,
 		Targeting = "Direction",
 		Range = 28,
-		Values = { Damage = 90, Speed = 70, Width = 2.5 },
+		Values = { Damage = { 90, 135, 180, 225 }, Speed = 70, Width = 2.5 },
 	},
 	["Ryuka.W"] = {
 		Name = "Power Surge",
@@ -78,7 +84,11 @@ Module.Abilities = {
 		Cost = 40,
 		Targeting = "Self",
 		Range = 0,
-		Values = { Duration = 5, AttackIntervalMultiplier = 0.7, MoveSpeedMultiplier = 1.1 },
+		Values = {
+			Duration = 5,
+			AttackIntervalMultiplier = { 0.75, 0.7, 0.65, 0.6 },
+			MoveSpeedMultiplier = 1.1,
+		},
 	},
 	["Ryuka.E"] = {
 		Name = "Flash Step",
@@ -96,7 +106,7 @@ Module.Abilities = {
 		Cost = 100,
 		Targeting = "Direction",
 		Range = 60,
-		Values = { ChannelTime = 1, Damage = 260, Width = 4 },
+		Values = { ChannelTime = 1, Damage = { 260, 380, 500 }, Width = 4 },
 	},
 	["Spell.Blink"] = {
 		Name = "Blink",

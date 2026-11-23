@@ -46,6 +46,10 @@ local function onHeroSpawned(hero: Unit, heroId: string)
 		RegenDelay = entry.ResourceRegenDelay,
 		RestoreOnHeroHit = entry.ResourceOnHeroHit,
 	})
+	-- A hero learns each ability by spending a level's point on it.
+	for slot in entry.Abilities do
+		AbilityServerService:SetRank(hero, slot :: Slot, 0)
+	end
 end
 
 local function onHeroRemoved(hero: Unit)

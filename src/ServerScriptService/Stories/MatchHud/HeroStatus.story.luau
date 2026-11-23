@@ -43,6 +43,14 @@ const CONTROLS = {
 		}),
 		3
 	),
+	Level = UILabs.Ordered(
+		UILabs.ControlGroup({
+			Level = UILabs.Ordered(UILabs.Slider(3, 1, 15, 1), 1),
+			-- Share of the way to the next level.
+			XpShare = UILabs.Ordered(UILabs.Slider(0.4, 0, 1, 0.05), 2),
+		}),
+		4
+	),
 }
 
 type StoryProps = {
@@ -50,6 +58,7 @@ type StoryProps = {
 		Hero: { Hero: () -> string, IsDead: () -> boolean },
 		Health: { Health: () -> number, Shield: () -> number },
 		Resource: { Resource: () -> number },
+		Level: { Level: () -> number, XpShare: () -> number },
 	},
 	target: Frame,
 }
@@ -83,6 +92,8 @@ local function story(props: StoryProps)
 			return getEntry().Resource
 		end,
 		IsDead = controls.Hero.IsDead,
+		Level = controls.Level.Level,
+		XpShare = controls.Level.XpShare,
 	})
 end
 

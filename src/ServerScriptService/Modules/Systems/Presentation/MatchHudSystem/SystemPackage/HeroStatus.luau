@@ -9,6 +9,8 @@ const HudTheme = require("./HudTheme")
 const WIDTH = 300
 const HEALTH_BAR_HEIGHT = 24
 const RESOURCE_BAR_HEIGHT = 16
+const XP_BAR_HEIGHT = 6
+const XP_COLOR = Color3.fromRGB(180, 120, 255)
 const GAP = 6
 
 export type HeroStatusProps = {
@@ -21,6 +23,9 @@ export type HeroStatusProps = {
 	-- "Mana", "Energy", "Stamina", or "None" for heroes on cooldowns only.
 	ResourceKind: () -> string,
 	IsDead: () -> boolean,
+	Level: () -> number,
+	-- Share of the way to the next level, 0 to 1. 1 at the top level.
+	XpShare: () -> number,
 }
 
 local function barText(text: () -> string, textSize: number): TextLabel
@@ -73,7 +78,8 @@ local function heroStatus(props: HeroStatusProps): Frame
 			Size = UDim2.new(1, 0, 0, HudTheme.BodyTextSize + 4),
 			Font = HudTheme.Font,
 			Text = function()
-				return if props.IsDead() then `{props.HeroName()} (reviving)` else props.HeroName()
+				local name = `{props.HeroName()}   Lv {props.Level()}`
+				return if props.IsDead() then `{name} (reviving)` else name
 			end,
 			TextSize = HudTheme.BodyTextSize,
 			TextColor3 = function()
@@ -148,6 +154,24 @@ local function heroStatus(props: HeroStatusProps): Frame
 			barText(function()
 				return `{math.floor(props.Resource())} / {math.floor(props.MaxResource())}`
 			end, 14),
+		}),
+
+		create("Frame")({
+			Name = "XpBar",
+			LayoutOrder = 4,
+			Size = UDim2.new(1, 0, 0, XP_BAR_HEIGHT),
+			BackgroundColor3 = HudTheme.BarBackground,
+
+			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+			create("Frame")({
+				Name = "Fill",
+				Size = function()
+					return UDim2.fromScale(math.clamp(props.XpShare(), 0, 1), 1)
+				end,
+				BackgroundColor3 = XP_COLOR,
+
+				create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+			}),
 		}),
 	})
 end

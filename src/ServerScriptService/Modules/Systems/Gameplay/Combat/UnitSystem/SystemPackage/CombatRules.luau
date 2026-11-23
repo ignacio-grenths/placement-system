@@ -48,7 +48,19 @@ function Module.applyModifiers(base: UnitStats, modifiers: { StatModifier }): Un
 		MIN_ATTACK_INTERVAL
 	)
 	stats.Armor = (base.Armor + (adds.Armor or 0)) * (multipliers.Armor or 1)
+	stats.MaxHealth =
+		math.max((base.MaxHealth + (adds.MaxHealth or 0)) * (multipliers.MaxHealth or 1), 1)
+	stats.AbilityPower = ((base.AbilityPower or 0) + (adds.AbilityPower or 0))
+		* (multipliers.AbilityPower or 1)
 	return stats
+end
+
+--[[
+	Returns ability damage after the caster's ability power, a percent bonus:
+	40 ability power makes 100 damage 140.
+]]
+function Module.amplifyAbilityDamage(amount: number, abilityPower: number?): number
+	return amount * (1 + (abilityPower or 0) / 100)
 end
 
 return Module

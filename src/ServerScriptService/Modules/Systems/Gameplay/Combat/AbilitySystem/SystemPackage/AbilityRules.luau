@@ -4,6 +4,8 @@ const exhaustiveMatch = require("@game/ServerScriptService/Modules/Utilities/exh
 
 const AbilityTypes = require("./AbilityTypes")
 
+type AbilityValues = AbilityTypes.AbilityValues
+type RankedValues = AbilityTypes.RankedValues
 type ResourceProfile = AbilityTypes.ResourceProfile
 type TargetFilter = AbilityTypes.TargetFilter
 
@@ -25,6 +27,23 @@ function Module.regenerate(
 		return current
 	end
 	return math.min(current + profile.RegenPerSecond * dt, maximum)
+end
+
+--[[
+	Picks each tuning number for a rank (1 and up). A list shorter than the
+	rank uses its last number, so a value that stops growing needs no
+	repeats.
+]]
+function Module.resolveValues(values: RankedValues, rank: number): AbilityValues
+	local resolved: AbilityValues = {}
+	for name, value in values do
+		if type(value) == "number" then
+			resolved[name] = value
+		else
+			resolved[name] = value[math.clamp(rank, 1, #value)]
+		end
+	end
+	return resolved
 end
 
 --[[

@@ -5,8 +5,8 @@ const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
 
--- Seconds a dead hero waits before reviving at its fountain. It will grow
--- with level once heroes level up.
+-- Seconds a dead hero waits before reviving at its fountain, unless a
+-- respawn delay provider says otherwise.
 const RESPAWN_DELAY = 8
 const FOUNTAIN_TICK = 0.5
 -- Share of max health and resource the fountain restores each tick.
@@ -36,6 +36,7 @@ local Module = {}
 Module.HeroSpawned = Signal.new() :: Signal.Signal<Unit, string>
 Module.HeroRemoved = Signal.new() :: Signal.Signal<Unit>
 
+local respawnDelayProvider: ((Unit) -> number)? = nil
 local definitions: { [string]: HeroDefinition? } = {}
 local fountains: { [Team]: Fountain? } = {}
 local heroes: { [Player]: Unit? } = {}
@@ -72,7 +73,8 @@ local function onUnitDied(unit: Unit)
 		return
 	end
 
-	task.delay(RESPAWN_DELAY, function()
+	local delay = if respawnDelayProvider then respawnDelayProvider(unit) else RESPAWN_DELAY
+	task.delay(delay, function()
 		if not unit.IsRemoved then
 			UnitServerService:Revive(unit, getSpawnPoint(unit.Team))
 		end
@@ -90,6 +92,14 @@ local function restoreAtFountains()
 			UnitServerService:RestoreResource(hero, hero.MaxResource * FOUNTAIN_RESTORE_SHARE)
 		end
 	end
+end
+
+--[[
+	Sets how many seconds a hero stays dead, such as by its level. Without a
+	provider every hero waits the same short delay.
+]]
+function Module:SetRespawnDelayProvider(provider: (Unit) -> number)
+	respawnDelayProvider = provider
 end
 
 function Module:RegisterHero(heroId: string, definition: HeroDefinition)

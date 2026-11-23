@@ -103,6 +103,12 @@ local function onInputBegan(input: InputObject, isProcessed: boolean)
 
 	-- Annotated because luau-lsp widens string literals read from a table.
 	local keyboardSlot: Slot? = KEYBOARD_SLOTS[input.KeyCode]
+	-- Ctrl plus an ability key ranks the ability up instead of casting it.
+	local isControlHeld = UserInputService:IsKeyDown(Enum.KeyCode.LeftControl)
+		or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)
+	if keyboardSlot and isControlHeld then
+		return
+	end
 	if keyboardSlot and input.UserInputType == Enum.UserInputType.Keyboard then
 		Module:RequestCast(keyboardSlot, { Kind = "Cursor" })
 		return

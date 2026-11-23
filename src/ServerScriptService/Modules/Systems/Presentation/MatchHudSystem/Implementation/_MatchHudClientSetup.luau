@@ -14,11 +14,22 @@ const source = Vide.source
 const AbilityClientService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/AbilitySystem/SystemPackage/AbilityClientService"
 )
+const GoldClientService = require(
+	"@game/ServerScriptService/Modules/Systems/Economy/GoldSystem/SystemPackage/GoldClientService"
+)
 const HeroCatalog = require("@game/ServerScriptService/Modules/Data/HeroCatalog")
+const HeroLevelClientService = require(
+	"@game/ServerScriptService/Modules/Systems/Progression/HeroLevelSystem/SystemPackage/HeroLevelClientService"
+)
+const ItemCatalog = require("@game/ServerScriptService/Modules/Data/ItemCatalog")
+const ItemShopClientService = require(
+	"@game/ServerScriptService/Modules/Systems/Economy/ItemShopSystem/SystemPackage/ItemShopClientService"
+)
 const MapLayout = require("@game/ServerScriptService/Modules/Data/MapLayout")
 const MatchNetwork = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/MatchSystem/SystemPackage/MatchNetwork"
 )
+const ProgressionCatalog = require("@game/ServerScriptService/Modules/Data/ProgressionCatalog")
 const Screen = require("@game/ServerScriptService/Modules/Utilities/Screen")
 const UnitClientService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitClientService"
@@ -28,9 +39,11 @@ const AbilityBar = require("../SystemPackage/AbilityBar")
 const EndScreen = require("../SystemPackage/EndScreen")
 const HeroStatus = require("../SystemPackage/HeroStatus")
 const HudTheme = require("../SystemPackage/HudTheme")
+const ItemBar = require("../SystemPackage/ItemBar")
 const Minimap = require("../SystemPackage/Minimap")
 const Scoreboard = require("../SystemPackage/Scoreboard")
 const ScoreStrip = require("../SystemPackage/ScoreStrip")
+const ShopPanel = require("../SystemPackage/ShopPanel")
 
 -- Seconds between refreshes. Cooldowns only show tenths below one second.
 const REFRESH_INTERVAL = 0.1
@@ -52,6 +65,10 @@ const DOT_SIZES = {
 const LOCAL_HERO_DOT_SIZE = 13
 const LOCAL_HERO_DOT_COLOR = Color3.fromRGB(120, 255, 150)
 const NEUTRAL_DOT_COLOR = Color3.fromRGB(230, 190, 80)
+const STATUS_GAP = 8
+-- UI units the shop's header and padding take, so its list scrolls instead
+-- of running off a short screen.
+const SHOP_CHROME_HEIGHT = 200
 
 const AbilityTypes = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/AbilitySystem/SystemPackage/AbilityTypes"
@@ -76,7 +93,12 @@ type HeroState = {
 	MaxResource: number,
 	ResourceKind: string,
 	IsDead: boolean,
+	Level: number,
+	XpShare: number,
 }
+
+type ItemSlotView = ItemBar.ItemSlotView
+type ShopItemView = ShopPanel.ShopItemView
 
 -- Vide checks for impure effects and yields in Studio, at a small cost.
 Vide.strict = RunService:IsStudio()
@@ -94,7 +116,16 @@ local heroState = source({
 	MaxResource = 0,
 	ResourceKind = "None",
 	IsDead = false,
+	Level = 1,
+	XpShare = 0,
 } :: HeroState)
+local gold = source(0)
+local itemSlots = source({} :: { ItemSlotView })
+local shopItems = source({} :: { ShopItemView })
+local isInventoryFull = source(false)
+local canBuyHere = source(false)
+local isAutoRanking = source(false)
+local isShopOpen = source(false)
 local elapsed = source(0)
 local blueKills = source(0)
 local redKills = source(0)
@@ -135,6 +166,7 @@ end
 
 local function buildAbilityViews(): { AbilityView }
 	local loadout = AbilityClientService:GetLoadout()
+	local levelState = HeroLevelClientService:GetState()
 	local hero = UnitClientService:GetLocalHero()
 	local labels = if Screen.isGamepad() then GAMEPAD_LABELS else KEYBOARD_LABELS
 	local now = workspace:GetServerTimeNow()
@@ -156,6 +188,12 @@ local function buildAbilityViews(): { AbilityView }
 			CooldownRemaining = if cooldown then math.max(cooldown.EndsAt - now, 0) else 0,
 			CooldownDuration = if cooldown then cooldown.Duration else 0,
 			IsEmpty = info == nil,
+			Rank = if levelState then levelState.Ranks[slot] or 0 else 0,
+			MaxRank = if not MAIN_SLOTS[slot]
+				then 0
+				elseif slot == "R" then ProgressionCatalog.MaxUltimateRank
+				else ProgressionCatalog.MaxBasicRank,
+			CanRankUp = if levelState then levelState.CanRankUp[slot] == true else false,
 		})
 	end
 	return views
@@ -180,6 +218,7 @@ local function buildHeroState(): HeroState
 		return heroState()
 	end
 	local entry = HeroCatalog.Heroes[hero.TypeId]
+	local levelState = HeroLevelClientService:GetState()
 	return {
 		Name = if entry then entry.DisplayName else hero.TypeId,
 		Health = hero.Health,
@@ -189,6 +228,10 @@ local function buildHeroState(): HeroState
 		MaxResource = hero.MaxResource,
 		ResourceKind = if entry then entry.Resource else "None",
 		IsDead = hero.IsDead,
+		Level = if levelState then levelState.Level else 1,
+		XpShare = if levelState and levelState.XpForNext > 0
+			then levelState.XpIntoLevel / levelState.XpForNext
+			else 1,
 	}
 end
 
@@ -261,11 +304,66 @@ local function refreshMatchState()
 	end
 end
 
+local function isLocalHeroAtFountain(): boolean
+	local hero = UnitClientService:GetLocalHero()
+	if not hero then
+		return false
+	end
+	-- A dead hero can shop from anywhere, as the server allows.
+	if hero.IsDead then
+		return true
+	end
+	local base = MapLayout.Bases[hero.Team :: MapLayout.MapTeam]
+	local position = UnitClientService:GetRenderPose(hero, UnitClientService:GetRenderTime())
+	return base ~= nil and (position - base.Fountain).Magnitude <= base.FountainRadius
+end
+
+local function refreshItems()
+	local inventory = ItemShopClientService:GetInventory()
+	local slots: { ItemSlotView } = {}
+	local ownsBoots = false
+	for slot = 1, ItemCatalog.InventorySize do
+		local entry = ItemCatalog.Items[inventory[slot] or ""]
+		if entry and entry.Kind == "Boots" then
+			ownsBoots = true
+		end
+		table.insert(slots, {
+			Name = if entry then entry.Name else "",
+			IsEmpty = entry == nil,
+			IsConsumable = entry ~= nil and entry.Kind == "Consumable",
+			KeyLabel = tostring(slot),
+		})
+	end
+	itemSlots(slots)
+	isInventoryFull(table.find(inventory, "") == nil and #inventory >= ItemCatalog.InventorySize)
+
+	local shop: { ShopItemView } = {}
+	for itemId, entry in ItemCatalog.Items do
+		table.insert(shop, {
+			Id = itemId,
+			Name = entry.Name,
+			Description = entry.Description,
+			Cost = entry.Cost,
+			IsOwned = entry.Kind == "Boots" and ownsBoots,
+		})
+	end
+	table.sort(shop, function(first, second)
+		return ItemCatalog.Items[first.Id].Order < ItemCatalog.Items[second.Id].Order
+	end)
+	shopItems(shop)
+
+	gold(GoldClientService:GetGold())
+	canBuyHere(isLocalHeroAtFountain())
+	local levelState = HeroLevelClientService:GetState()
+	isAutoRanking(levelState ~= nil and levelState.IsAutoRanking)
+end
+
 local function refresh()
 	abilities(buildAbilityViews())
 	channel(buildChannelView())
 	heroState(buildHeroState())
 	minimapDots(buildMinimapDots())
+	refreshItems()
 	refreshMatchState()
 end
 
@@ -288,6 +386,8 @@ local function onInputBegan(input: InputObject, isProcessed: boolean)
 	end
 	if input.KeyCode == Enum.KeyCode.Tab then
 		isScoreboardHeld(true)
+	elseif input.KeyCode == Enum.KeyCode.P or input.KeyCode == Enum.KeyCode.ButtonY then
+		isShopOpen(not isShopOpen())
 	elseif input.KeyCode == Enum.KeyCode.ButtonSelect then
 		isScoreboardToggled(not isScoreboardToggled())
 	end
@@ -341,6 +441,24 @@ local function hud(): ScreenGui
 					else UDim2.new(0, EDGE_MARGIN, 1, -EDGE_MARGIN)
 			end,
 
+			create("UIListLayout")({
+				FillDirection = Enum.FillDirection.Vertical,
+				Padding = UDim.new(0, STATUS_GAP),
+			}),
+			ItemBar({
+				Items = itemSlots,
+				Gold = gold,
+				IsAutoRanking = isAutoRanking,
+				OnUse = function(slot: number)
+					ItemShopClientService:RequestUse(slot)
+				end,
+				OnShopPressed = function()
+					isShopOpen(not isShopOpen())
+				end,
+				OnAutoRankPressed = function()
+					HeroLevelClientService:SetAutoRanking(not isAutoRanking())
+				end,
+			}),
 			HeroStatus({
 				HeroName = function()
 					return heroState().Name
@@ -366,6 +484,12 @@ local function hud(): ScreenGui
 				IsDead = function()
 					return heroState().IsDead
 				end,
+				Level = function()
+					return heroState().Level
+				end,
+				XpShare = function()
+					return heroState().XpShare
+				end,
 			}),
 		}),
 
@@ -374,6 +498,26 @@ local function hud(): ScreenGui
 			Channel = channel,
 			IsTouch = isTouch,
 			OnCast = onCast,
+			OnRankUp = function(slot: string)
+				HeroLevelClientService:RequestRankUp(slot)
+			end,
+		}),
+
+		ShopPanel({
+			Items = shopItems,
+			Gold = gold,
+			CanBuyHere = canBuyHere,
+			IsInventoryFull = isInventoryFull,
+			IsOpen = isShopOpen,
+			MaxListHeight = function()
+				return math.max(Screen.usableSize().Y - SHOP_CHROME_HEIGHT, 120)
+			end,
+			OnBuy = function(itemId: string)
+				ItemShopClientService:RequestBuy(itemId)
+			end,
+			OnClose = function()
+				isShopOpen(false)
+			end,
 		}),
 
 		Scoreboard({
@@ -438,6 +582,9 @@ function Module:Start()
 	AbilityClientService.LoadoutChanged:Connect(refresh)
 	AbilityClientService.CooldownStarted:Connect(refresh)
 	AbilityClientService.ChannelChanged:Connect(refresh)
+	HeroLevelClientService.StateChanged:Connect(refresh)
+	ItemShopClientService.InventoryChanged:Connect(refresh)
+	GoldClientService.GoldChanged:Connect(refresh)
 	UserInputService.InputBegan:Connect(onInputBegan)
 	UserInputService.InputEnded:Connect(onInputEnded)
 	RunService.Heartbeat:Connect(function(deltaTime)

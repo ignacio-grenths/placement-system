@@ -26,7 +26,18 @@ export type HeroEntry = {
 	-- AbilityCatalog ids by slot (Q, W, E, R). Empty until the hero's kit is
 	-- built.
 	Abilities: { [string]: string },
+	-- Basic abilities to rank up first when ranks are chosen automatically.
+	-- R always goes first when it can.
+	SkillOrder: { string },
 	Stats: UnitStats,
+	-- Added to Stats on each level after the first, and to MaxResource for
+	-- heroes whose pool grows (mana).
+	Growth: {
+		MaxHealth: number,
+		Armor: number,
+		AttackDamage: number,
+		MaxResource: number,
+	},
 	-- Placeholder body color until the hero's model exists.
 	Color: Color3,
 	SummonerSpells: { SummonerSpell },
@@ -59,6 +70,9 @@ Module.Heroes = {
 			Radius = 1.3,
 		},
 		Color = Color3.fromRGB(255, 150, 40),
+		SkillOrder = { "Q", "W", "E" },
+		-- Energy is a fixed pool, so it does not grow.
+		Growth = { MaxHealth = 82, Armor = 3, AttackDamage = 3.2, MaxResource = 0 },
 		SummonerSpells = { "Blink", "Scorch" },
 	},
 	Ryuka = {
@@ -82,6 +96,8 @@ Module.Heroes = {
 			ProjectileSpeed = 70,
 		},
 		Color = Color3.fromRGB(250, 220, 60),
+		SkillOrder = { "Q", "W", "E" },
+		Growth = { MaxHealth = 76, Armor = 3, AttackDamage = 3, MaxResource = 30 },
 		SummonerSpells = { "Blink", "Mend" },
 	},
 	Torvik = {
@@ -104,6 +120,9 @@ Module.Heroes = {
 			Radius = 1.3,
 		},
 		Color = Color3.fromRGB(150, 110, 80),
+		SkillOrder = { "Q", "E", "W" },
+		-- Stamina is a fixed pool, so it does not grow.
+		Growth = { MaxHealth = 90, Armor = 3.5, AttackDamage = 3.3, MaxResource = 0 },
 		SummonerSpells = { "Blink", "Warp" },
 	},
 	SeoDan = {
@@ -126,6 +145,8 @@ Module.Heroes = {
 			Radius = 1.3,
 		},
 		Color = Color3.fromRGB(110, 80, 200),
+		SkillOrder = { "Q", "W", "E" },
+		Growth = { MaxHealth = 85, Armor = 3.2, AttackDamage = 3, MaxResource = 28 },
 		SummonerSpells = { "Blink", "Hunt" },
 	},
 	Brakk = {
@@ -148,6 +169,8 @@ Module.Heroes = {
 			Radius = 1.5,
 		},
 		Color = Color3.fromRGB(190, 70, 60),
+		SkillOrder = { "W", "Q", "E" },
+		Growth = { MaxHealth = 95, Armor = 4, AttackDamage = 2.5, MaxResource = 0 },
 		SummonerSpells = { "Blink", "Drain" },
 	},
 } :: { [string]: HeroEntry }

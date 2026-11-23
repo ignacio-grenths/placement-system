@@ -24,7 +24,6 @@ const UnitTypes = require(
 
 type AbilityHandler = AbilityTypes.AbilityHandler
 type AbilityInfo = AbilityTypes.AbilityInfo
-type AbilityValues = AbilityTypes.AbilityValues
 type Aim = AbilityTypes.Aim
 type CastContext = AbilityTypes.CastContext
 type DamageKind = UnitTypes.DamageKind
@@ -44,7 +43,7 @@ export type AbilityDefinition = {
 	Targeting: Targeting,
 	Range: number,
 	TargetFilter: TargetFilter?,
-	Values: AbilityValues,
+	Values: RankedValues,
 }
 
 export type ChannelOptions = {
@@ -76,9 +75,11 @@ export type SkillshotOptions = {
 	OnHit: (Unit) -> (),
 }
 
+type RankedValues = AbilityTypes.RankedValues
+
 type RegisteredAbility = {
 	Info: AbilityInfo,
-	Values: AbilityValues,
+	Values: RankedValues,
 	Handler: AbilityHandler,
 }
 
@@ -91,6 +92,9 @@ type Channel = {
 
 type CasterState = {
 	Loadout: { [Slot]: string? },
+	-- A slot with no rank here casts at rank 1, like summoner spells. A slot
+	-- at rank 0 is not learned yet.
+	Ranks: { [Slot]: number? },
 	CooldownEnds: { [Slot]: number? },
 	Profile: ResourceProfile,
 	LastSpendTime: number,
@@ -373,6 +377,7 @@ end
 function Module:SetupCaster(unit: Unit, loadout: { [Slot]: string? }, profile: ResourceProfile)
 	casters[unit] = {
 		Loadout = table.clone(loadout),
+		Ranks = {},
 		CooldownEnds = {},
 		Profile = profile,
 		LastSpendTime = 0,
@@ -399,6 +404,17 @@ function Module:RemoveCaster(unit: Unit)
 end
 
 --[[
+	Sets the rank a slot's ability casts at. Rank 0 means not learned, and the
+	slot refuses to cast.
+]]
+function Module:SetRank(unit: Unit, slot: Slot, rank: number)
+	local state = casters[unit]
+	if state then
+		state.Ranks[slot] = rank
+	end
+end
+
+--[[
 	Casts the ability in a slot. Returns false and a reason when it can't be
 	cast, in which case nothing is spent.
 ]]
@@ -416,6 +432,10 @@ function Module:Cast(unit: Unit, slot: Slot, aim: Aim?): (boolean, string?)
 	local ability = if abilityId then abilities[abilityId] else nil
 	if not ability then
 		return false, "EmptySlot"
+	end
+	local rank = state.Ranks[slot] or 1
+	if rank < 1 then
+		return false, "NotLearned"
 	end
 	local cooldownEnd = state.CooldownEnds[slot]
 	if cooldownEnd and now < cooldownEnd then
@@ -439,7 +459,7 @@ function Module:Cast(unit: Unit, slot: Slot, aim: Aim?): (boolean, string?)
 	local context: CastContext = {
 		Caster = unit,
 		Info = ability.Info,
-		Values = ability.Values,
+		Values = AbilityRules.resolveValues(ability.Values, rank),
 		AimPoint = aimPoint,
 		Direction = direction,
 		Target = target,

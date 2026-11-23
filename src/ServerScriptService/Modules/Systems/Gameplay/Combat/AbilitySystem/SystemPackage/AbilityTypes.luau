@@ -28,8 +28,13 @@ export type AbilityInfo = {
 	TargetFilter: TargetFilter?,
 }
 
--- Tuning numbers an ability's handler reads, such as Damage or Duration.
+-- Tuning numbers an ability's handler reads, such as Damage or Duration,
+-- already picked for the rank it was cast at.
 export type AbilityValues = { [string]: number }
+
+-- Tuning numbers as a catalog lists them: one number for every rank, or a
+-- list with one number per rank.
+export type RankedValues = { [string]: number | { number } }
 
 export type CastContext = {
 	Caster: UnitTypes.Unit,

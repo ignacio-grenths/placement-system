@@ -8,6 +8,7 @@ const AbilityBar = require(
 )
 const AbilityCatalog = require("@game/ServerScriptService/Modules/Data/AbilityCatalog")
 const HeroCatalog = require("@game/ServerScriptService/Modules/Data/HeroCatalog")
+const ProgressionCatalog = require("@game/ServerScriptService/Modules/Data/ProgressionCatalog")
 
 const SLOT_ORDER = { "Q", "W", "E", "R", "D", "F", "B" }
 const MAIN_SLOTS = { Q = true, W = true, E = true, R = true }
@@ -45,13 +46,23 @@ const CONTROLS = {
 		}),
 		2
 	),
+	Ranks = UILabs.Ordered(
+		UILabs.ControlGroup({
+			-- Rank of Q, W, and E. 0 shows them not learned yet.
+			BasicRank = UILabs.Ordered(UILabs.Slider(1, 0, 4, 1), 1),
+			RRank = UILabs.Ordered(UILabs.Slider(0, 0, 3, 1), 2),
+			-- Shows the + badge on every ability.
+			CanRankUp = UILabs.Ordered(true, 3),
+		}),
+		3
+	),
 	Layout = UILabs.Ordered(
 		UILabs.ControlGroup({
 			IsTouch = UILabs.Ordered(false, 1),
 			-- Shows the slots empty, as before the loadout arrives.
 			IsLoadoutEmpty = UILabs.Ordered(false, 2),
 		}),
-		3
+		4
 	),
 }
 
@@ -65,6 +76,11 @@ type StoryProps = {
 			QRemaining: () -> number,
 			RRemaining: () -> number,
 			Recall: () -> number,
+		},
+		Ranks: {
+			BasicRank: () -> number,
+			RRank: () -> number,
+			CanRankUp: () -> boolean,
 		},
 		Layout: {
 			IsTouch: () -> boolean,
@@ -117,6 +133,15 @@ local function story(props: StoryProps)
 				CooldownRemaining = if cooldown then cooldown.Remaining else 0,
 				CooldownDuration = if cooldown then cooldown.Duration else 0,
 				IsEmpty = entry == nil,
+				Rank = if not MAIN_SLOTS[slot]
+					then 0
+					elseif slot == "R" then controls.Ranks.RRank()
+					else controls.Ranks.BasicRank(),
+				MaxRank = if not MAIN_SLOTS[slot]
+					then 0
+					elseif slot == "R" then ProgressionCatalog.MaxUltimateRank
+					else ProgressionCatalog.MaxBasicRank,
+				CanRankUp = MAIN_SLOTS[slot] == true and controls.Ranks.CanRankUp(),
 			})
 		end
 		return views
@@ -133,6 +158,9 @@ local function story(props: StoryProps)
 		IsTouch = controls.Layout.IsTouch,
 		OnCast = function(slot: string, aim: Vector2?)
 			print(`Cast {slot}`, aim)
+		end,
+		OnRankUp = function(slot: string)
+			print(`Rank up {slot}`)
 		end,
 	})
 end

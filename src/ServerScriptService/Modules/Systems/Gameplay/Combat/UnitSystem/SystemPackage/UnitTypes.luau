@@ -5,7 +5,13 @@ export type Team = "Blue" | "Red" | "Neutral"
 export type UnitKind = "Hero" | "Minion" | "Monster" | "Structure" | "Summon"
 -- Attack and Ability damage are reduced by armor; True damage is not.
 export type DamageKind = "Attack" | "Ability" | "True"
-export type StatName = "MoveSpeed" | "AttackDamage" | "AttackInterval" | "Armor"
+export type StatName =
+	"MoveSpeed"
+	| "AttackDamage"
+	| "AttackInterval"
+	| "Armor"
+	| "MaxHealth"
+	| "AbilityPower"
 
 export type UnitStats = {
 	MaxHealth: number,
@@ -20,6 +26,8 @@ export type UnitStats = {
 	Radius: number,
 	-- Studs per second. Nil for melee attacks, which land at once.
 	ProjectileSpeed: number?,
+	-- Percent added to the unit's ability damage. Nil counts as 0.
+	AbilityPower: number?,
 }
 
 -- Changes one stat: Add applies to the base value first, then Multiply.
@@ -31,7 +39,8 @@ export type StatModifier = {
 
 export type TimedModifier = {
 	Modifier: StatModifier,
-	-- os.clock() time the modifier ends.
+	-- os.clock() time the modifier ends. math.huge for a permanent one,
+	-- such as an item's, which survives death.
 	ExpiresAt: number,
 }
 
