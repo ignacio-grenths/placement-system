@@ -9,6 +9,13 @@ export type CampEntry = {
 	Respawn: number,
 }
 
+export type BuffInfo = {
+	Name: string,
+	-- One short line on what the buff does, for the HUD.
+	Description: string,
+	Color: Color3,
+}
+
 local Module = {}
 
 -- By MapLayout camp Id, which Blue's and Red's copies of a camp share.
@@ -53,6 +60,30 @@ Module.HiveCall = {
 	AttackDamageMultiplier = 1.5,
 	Armor = 40,
 }
+
+-- How each buff shows on the HUD, by buff id.
+Module.BuffInfo = {
+	Focus = {
+		Name = "Focus",
+		Description = "Faster cooldowns",
+		Color = Color3.fromRGB(110, 180, 255),
+	},
+	Burn = {
+		Name = "Burn",
+		Description = "Attacks slow and burn",
+		Color = Color3.fromRGB(255, 130, 60),
+	},
+	Skyray = {
+		Name = "Skyray",
+		Description = "More attack and power",
+		Color = Color3.fromRGB(120, 230, 255),
+	},
+	HiveCall = {
+		Name = "Hive Call",
+		Description = "Your aliens are stronger",
+		Color = Color3.fromRGB(190, 90, 230),
+	},
+} :: { [string]: BuffInfo? }
 
 -- Studs from its camp that a monster chases before it gives up and goes home.
 Module.LeashRadius = 22

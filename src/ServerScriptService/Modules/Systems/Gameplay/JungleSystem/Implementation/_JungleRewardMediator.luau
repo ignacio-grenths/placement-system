@@ -16,21 +16,20 @@ const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
 
+const JungleNetwork = require("../SystemPackage/JungleNetwork")
 const JungleServerService = require("../SystemPackage/JungleServerService")
 
 -- Seconds between two ticks of a burn.
 const BURN_TICK = 0.5
 const BUFF_RING_RADIUS = 4
 const BUFF_RING_SECONDS = 0.8
-const FOCUS_COLOR = Color3.fromRGB(110, 180, 255)
-const BURN_COLOR = Color3.fromRGB(255, 120, 50)
-const SKYRAY_COLOR = Color3.fromRGB(120, 230, 255)
-const HIVE_CALL_COLOR = Color3.fromRGB(170, 70, 200)
+const BOSS_KINDS = { Skyray = true, HiveQueen = true }
 
 const UnitTypes = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitTypes"
 )
 
+type BuffState = JungleNetwork.BuffState
 type DamageKind = UnitTypes.DamageKind
 type Unit = UnitTypes.Unit
 
@@ -42,7 +41,8 @@ type Burn = {
 
 local Module = {}
 
--- os.clock() time each hero's Burn buff ends.
+-- os.clock() time each hero's Focus and Burn buffs end.
+local focusHolders: { [Unit]: number? } = {}
 local burnHolders: { [Unit]: number? } = {}
 local burns: { [Unit]: Burn } = {}
 -- By team: how many Skyrays it has slain, and when its Hive Call ends.
@@ -50,14 +50,43 @@ local skyrayStacks: { [string]: number? } = {}
 local hiveCallEndsAt: { [string]: number? } = {}
 local burnTimer = 0
 
-local function showBuff(unit: Unit, color: Color3)
+local function showBuff(unit: Unit, buffId: string)
+	local info = JungleCatalog.BuffInfo[buffId]
 	AbilityServerService:PlayEffect({
 		Kind = "Ring",
 		Position = unit.Position,
 		Radius = BUFF_RING_RADIUS,
-		Color = color,
+		Color = if info then info.Color else Color3.new(1, 1, 1),
 		Duration = BUFF_RING_SECONDS,
 	})
+end
+
+--[[
+	Tells a player's client every buff their hero holds, so the HUD can show
+	them. Bot heroes have no one to tell.
+]]
+local function sendBuffs(hero: Unit)
+	local player = hero.OwnerPlayer
+	if not player then
+		return
+	end
+
+	local now = os.clock()
+	local serverNow = workspace:GetServerTimeNow()
+	local buffs: { BuffState } = {}
+	local function addTimed(id: string, endsAt: number?)
+		if endsAt and endsAt > now then
+			table.insert(buffs, { Id = id, ExpiresAt = serverNow + endsAt - now, Stacks = 1 })
+		end
+	end
+	addTimed("Focus", focusHolders[hero])
+	addTimed("Burn", burnHolders[hero])
+	addTimed("HiveCall", hiveCallEndsAt[hero.Team])
+	local stacks = skyrayStacks[hero.Team] or 0
+	if stacks > 0 then
+		table.insert(buffs, { Id = "Skyray", ExpiresAt = 0, Stacks = stacks })
+	end
+	JungleNetwork.BuffsChanged:FireClient(player, buffs)
 end
 
 local function getTeamHeroes(team: string): { Unit }
@@ -110,12 +139,15 @@ local function grantFocus(hero: Unit)
 		{ Stat = "AbilityHaste", Add = focus.AbilityHaste },
 		focus.Duration
 	)
-	showBuff(hero, FOCUS_COLOR)
+	focusHolders[hero] = os.clock() + focus.Duration
+	showBuff(hero, "Focus")
+	sendBuffs(hero)
 end
 
 local function grantBurn(hero: Unit)
 	burnHolders[hero] = os.clock() + JungleCatalog.Burn.Duration
-	showBuff(hero, BURN_COLOR)
+	showBuff(hero, "Burn")
+	sendBuffs(hero)
 end
 
 local function grantSkyray(team: string)
@@ -123,7 +155,8 @@ local function grantSkyray(team: string)
 	skyrayStacks[team] = stack
 	for _, hero in getTeamHeroes(team) do
 		addSkyrayStack(hero, stack)
-		showBuff(hero, SKYRAY_COLOR)
+		showBuff(hero, "Skyray")
+		sendBuffs(hero)
 	end
 end
 
@@ -136,13 +169,17 @@ local function startHiveCall(team: string)
 		end
 	end
 	for _, hero in getTeamHeroes(team) do
-		showBuff(hero, HIVE_CALL_COLOR)
+		showBuff(hero, "HiveCall")
+		sendBuffs(hero)
 	end
 end
 
 local function onCampCleared(_key: string, kind: string, killer: Unit?)
 	if not killer then
 		return
+	end
+	if BOSS_KINDS[kind] then
+		JungleNetwork.BossSlain:FireAllClients(kind, killer.Team)
 	end
 
 	-- A buff goes to the hero who landed the last hit; the bosses reward the
@@ -188,8 +225,12 @@ end
 
 local function onUnitDied(unit: Unit)
 	-- Buffs end with their holder, as every timed modifier does.
-	burnHolders[unit] = nil
 	burns[unit] = nil
+	if unit.Kind == "Hero" then
+		focusHolders[unit] = nil
+		burnHolders[unit] = nil
+		sendBuffs(unit)
+	end
 end
 
 local function onMinionSpawned(minion: Unit)
@@ -210,6 +251,7 @@ local function onHeroSpawned(hero: Unit)
 	for stack = 1, skyrayStacks[hero.Team] or 0 do
 		addSkyrayStack(hero, stack)
 	end
+	sendBuffs(hero)
 end
 
 local function stepBurns(frameTime: number)

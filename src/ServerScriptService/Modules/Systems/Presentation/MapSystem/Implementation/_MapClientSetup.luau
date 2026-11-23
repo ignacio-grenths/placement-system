@@ -96,6 +96,10 @@ const DETAIL_GLOW_LAYER = 5.3
 const DETAIL_RING_LAYER = 5.6
 
 const NEON = { Material = Enum.Material.Neon }
+-- Force fields pulse, and a bright one at its peak blooms a pale haze over
+-- the dark floor around it, so fields are dark and see-through.
+const FIELD = { Material = Enum.Material.ForceField, Transparency = 0.4 }
+const FIELD_DARKENING = 0.55
 
 type PropOptions = MapClientService.PropOptions
 
@@ -308,9 +312,13 @@ local function drawBases()
 
 		local fountain = base.Fountain
 		MapClientService:DrawDisc(fountain, base.FountainRadius, PAD_FLOOR_COLOR, DETAIL_LAYER)
-		MapClientService:DrawDisc(fountain, base.FountainRadius - 2, sideColor, DETAIL_GLOW_LAYER, {
-			Material = Enum.Material.ForceField,
-		})
+		MapClientService:DrawDisc(
+			fountain,
+			base.FountainRadius - 2,
+			sideColor:Lerp(Color3.new(0, 0, 0), FIELD_DARKENING),
+			DETAIL_GLOW_LAYER,
+			FIELD
+		)
 		MapClientService:DrawRing(
 			fountain,
 			base.FountainRadius,
@@ -359,9 +367,13 @@ end
 
 local function drawLaunchPads()
 	for _, pad in MapLayout.LaunchPads do
-		MapClientService:DrawDisc(pad.Position, PAD_RADIUS, LAUNCH_COLOR, DETAIL_GLOW_LAYER, {
-			Material = Enum.Material.ForceField,
-		})
+		MapClientService:DrawDisc(
+			pad.Position,
+			PAD_RADIUS,
+			LAUNCH_COLOR:Lerp(Color3.new(0, 0, 0), FIELD_DARKENING),
+			DETAIL_GLOW_LAYER,
+			FIELD
+		)
 		MapClientService:DrawRing(
 			pad.Position,
 			PAD_RADIUS,

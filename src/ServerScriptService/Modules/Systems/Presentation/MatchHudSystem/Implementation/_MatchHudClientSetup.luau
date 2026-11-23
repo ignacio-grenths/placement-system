@@ -25,17 +25,24 @@ const ItemCatalog = require("@game/ServerScriptService/Modules/Data/ItemCatalog"
 const ItemShopClientService = require(
 	"@game/ServerScriptService/Modules/Systems/Economy/ItemShopSystem/SystemPackage/ItemShopClientService"
 )
+const JungleCatalog = require("@game/ServerScriptService/Modules/Data/JungleCatalog")
+const JungleClientService = require(
+	"@game/ServerScriptService/Modules/Systems/Gameplay/JungleSystem/SystemPackage/JungleClientService"
+)
 const MapLayout = require("@game/ServerScriptService/Modules/Data/MapLayout")
 const MatchNetwork = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/MatchSystem/SystemPackage/MatchNetwork"
 )
 const ProgressionCatalog = require("@game/ServerScriptService/Modules/Data/ProgressionCatalog")
 const Screen = require("@game/ServerScriptService/Modules/Utilities/Screen")
+const UnitCatalog = require("@game/ServerScriptService/Modules/Data/UnitCatalog")
 const UnitClientService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitClientService"
 )
 
 const AbilityBar = require("../SystemPackage/AbilityBar")
+const Announcement = require("../SystemPackage/Announcement")
+const BuffBar = require("../SystemPackage/BuffBar")
 const EndScreen = require("../SystemPackage/EndScreen")
 const HeroStatus = require("../SystemPackage/HeroStatus")
 const HudTheme = require("../SystemPackage/HudTheme")
@@ -69,6 +76,14 @@ const STATUS_GAP = 8
 -- UI units the shop's header and padding take, so its list scrolls instead
 -- of running off a short screen.
 const SHOP_CHROME_HEIGHT = 200
+-- Seconds an announcement stays up: long enough to read mid-fight. While
+-- others wait their turn, each gets only the shorter time.
+const ANNOUNCEMENT_SECONDS = 6
+const QUEUED_ANNOUNCEMENT_SECONDS = 2.5
+const TOP_GAP = 8
+-- Buffs whose own camp a hero takes, announced to that hero alone. Boss
+-- buffs come with the boss's own announcement.
+const PERSONAL_BUFFS = { Focus = true, Burn = true }
 
 const AbilityTypes = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/AbilitySystem/SystemPackage/AbilityTypes"
@@ -78,6 +93,8 @@ const MatchTypes = require(
 )
 
 type AbilityView = AbilityBar.AbilityView
+type AnnouncementView = Announcement.AnnouncementView
+type BuffView = BuffBar.BuffView
 type ChannelView = AbilityBar.ChannelView
 type MinimapDot = Minimap.MinimapDot
 type ScoreEntry = MatchTypes.ScoreEntry
@@ -136,6 +153,12 @@ local result = source(nil :: string?)
 local resultDetail = source("")
 local isEndScreenDismissed = source(false)
 local minimapDots = source({} :: { MinimapDot })
+local buffViews = source({} :: { BuffView })
+local announcement = source(nil :: AnnouncementView?)
+local announcementShownAt = 0
+local announcementEndsAt = 0
+local queuedAnnouncements: { AnnouncementView } = {}
+local heldBuffIds: { [string]: boolean } = {}
 local refreshTimer = 0
 
 local function toMapPoint(position: Vector3): Vector2
@@ -366,11 +389,89 @@ local function refreshItems()
 	isAutoRanking(levelState ~= nil and levelState.IsAutoRanking)
 end
 
+local function buildBuffViews(): { BuffView }
+	local now = workspace:GetServerTimeNow()
+	local views: { BuffView } = {}
+	for _, buff in JungleClientService:GetBuffs() do
+		local info = JungleCatalog.BuffInfo[buff.Id]
+		local isLasting = buff.ExpiresAt == 0
+		if not info or (not isLasting and buff.ExpiresAt <= now) then
+			continue
+		end
+		table.insert(views, {
+			Name = info.Name,
+			Color = info.Color,
+			SecondsLeft = if isLasting then nil else math.ceil(buff.ExpiresAt - now),
+			Stacks = buff.Stacks,
+		})
+	end
+	return views
+end
+
+local function showAnnouncement(view: AnnouncementView)
+	local now = os.clock()
+	announcement(view)
+	announcementShownAt = now
+	local seconds = if #queuedAnnouncements > 0
+		then QUEUED_ANNOUNCEMENT_SECONDS
+		else ANNOUNCEMENT_SECONDS
+	announcementEndsAt = now + seconds
+end
+
+local function announce(text: string, color: Color3)
+	local view = {
+		Text = text,
+		Color = color,
+	}
+	if not announcement() then
+		showAnnouncement(view)
+		return
+	end
+	table.insert(queuedAnnouncements, view)
+	announcementEndsAt =
+		math.min(announcementEndsAt, announcementShownAt + QUEUED_ANNOUNCEMENT_SECONDS)
+end
+
+local function stepAnnouncements()
+	if not announcement() or os.clock() < announcementEndsAt then
+		return
+	end
+	local nextView = table.remove(queuedAnnouncements, 1)
+	if nextView then
+		showAnnouncement(nextView)
+	else
+		announcement(nil)
+	end
+end
+
+local function onBossSlain(kind: string, team: string)
+	local hero = UnitClientService:GetLocalHero()
+	local entry = UnitCatalog.Units[kind]
+	local bossName = if entry then entry.DisplayName else kind
+	local taker = if hero and hero.Team == team then "Your team" else "The enemy team"
+	announce(`{taker} took the {bossName}!`, HudTheme.TeamColors[team] or HudTheme.StrokeColor)
+end
+
+local function onBuffsChanged(buffs: { JungleClientService.BuffState })
+	local held = {}
+	for _, buff in buffs do
+		held[buff.Id] = true
+		local info = JungleCatalog.BuffInfo[buff.Id]
+		if info and PERSONAL_BUFFS[buff.Id] and not heldBuffIds[buff.Id] then
+			announce(`You got {info.Name}: {string.lower(info.Description)}`, info.Color)
+		end
+	end
+	heldBuffIds = held
+	buffViews(buildBuffViews())
+end
+
 local function refresh()
 	abilities(buildAbilityViews())
 	channel(buildChannelView())
 	heroState(buildHeroState())
 	minimapDots(buildMinimapDots())
+	buffViews(buildBuffViews())
+	stepAnnouncements()
 	refreshItems()
 	refreshMatchState()
 end
@@ -425,6 +526,11 @@ local function hud(): ScreenGui
 			AnchorPoint = Vector2.new(0.5, 0),
 			Position = UDim2.new(0.5, 0, 0, TOUCH_EDGE_MARGIN),
 
+			create("UIListLayout")({
+				FillDirection = Enum.FillDirection.Vertical,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				Padding = UDim.new(0, TOP_GAP),
+			}),
 			ScoreStrip({
 				Elapsed = elapsed,
 				BlueKills = blueKills,
@@ -432,6 +538,9 @@ local function hud(): ScreenGui
 				OnScoresPressed = function()
 					isScoreboardToggled(not isScoreboardToggled())
 				end,
+			}),
+			Announcement({
+				Message = announcement,
 			}),
 		}),
 
@@ -452,6 +561,9 @@ local function hud(): ScreenGui
 			create("UIListLayout")({
 				FillDirection = Enum.FillDirection.Vertical,
 				Padding = UDim.new(0, STATUS_GAP),
+			}),
+			BuffBar({
+				Buffs = buffViews,
 			}),
 			ItemBar({
 				Items = itemSlots,
@@ -589,6 +701,8 @@ local function minimapGui(): ScreenGui
 end
 
 function Module:Start()
+	JungleClientService.BuffsChanged:Connect(onBuffsChanged)
+	JungleClientService.BossSlain:Connect(onBossSlain)
 	AbilityClientService.LoadoutChanged:Connect(refresh)
 	AbilityClientService.CooldownStarted:Connect(refresh)
 	AbilityClientService.ChannelChanged:Connect(refresh)
