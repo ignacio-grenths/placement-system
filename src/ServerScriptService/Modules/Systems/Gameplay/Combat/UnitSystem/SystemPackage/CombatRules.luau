@@ -1,5 +1,13 @@
 --!strict
 
+-- Seconds. Attack speed buffs can't push attacks past this rate.
+const MIN_ATTACK_INTERVAL = 0.25
+
+const UnitTypes = require("./UnitTypes")
+
+type StatModifier = UnitTypes.StatModifier
+type UnitStats = UnitTypes.UnitStats
+
 local Module = {}
 
 --[[
@@ -13,6 +21,34 @@ function Module.mitigateDamage(amount: number, armor: number): number
 	end
 
 	return amount * (2 - 100 / (100 - armor))
+end
+
+--[[
+	Returns a unit's stats with its modifiers applied. Each modifier adds to
+	the base value first, then all multipliers apply, so two 30% slows stack
+	to 49% of the base speed instead of 40%.
+]]
+function Module.applyModifiers(base: UnitStats, modifiers: { StatModifier }): UnitStats
+	local adds: { [string]: number } = {}
+	local multipliers: { [string]: number } = {}
+	for _, modifier in modifiers do
+		adds[modifier.Stat] = (adds[modifier.Stat] or 0) + (modifier.Add or 0)
+		multipliers[modifier.Stat] = (multipliers[modifier.Stat] or 1) * (modifier.Multiply or 1)
+	end
+
+	local stats = table.clone(base)
+	stats.MoveSpeed =
+		math.max((base.MoveSpeed + (adds.MoveSpeed or 0)) * (multipliers.MoveSpeed or 1), 0)
+	stats.AttackDamage = math.max(
+		(base.AttackDamage + (adds.AttackDamage or 0)) * (multipliers.AttackDamage or 1),
+		0
+	)
+	stats.AttackInterval = math.max(
+		(base.AttackInterval + (adds.AttackInterval or 0)) * (multipliers.AttackInterval or 1),
+		MIN_ATTACK_INTERVAL
+	)
+	stats.Armor = (base.Armor + (adds.Armor or 0)) * (multipliers.Armor or 1)
+	return stats
 end
 
 return Module

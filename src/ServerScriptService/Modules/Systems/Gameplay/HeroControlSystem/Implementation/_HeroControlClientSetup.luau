@@ -1,5 +1,7 @@
 --!strict
 
+const GuiService = game:GetService("GuiService")
+
 const GroundPlane = require("@game/ServerScriptService/Modules/Utilities/GroundPlane")
 const UnitClientService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitClientService"
@@ -42,6 +44,12 @@ end
 function Module:Init()
 	HeroControlClientService:SetPicker(pick)
 	HeroControlClientService:SetHeroPositionProvider(getLocalHeroPosition)
+end
+
+function Module:Start()
+	-- Heroes walk by tapping the ground, so Roblox's thumbstick and jump
+	-- button would do nothing but cover the ability buttons.
+	GuiService.TouchControlsEnabled = false
 end
 
 return Module

@@ -24,10 +24,15 @@ const PROJECTILE_HIT_DISTANCE = 1
 const SYNC_COOLDOWN = 5
 -- Unit ids travel as unsigned 16-bit values.
 const MAX_UNIT_ID = 65535
+-- Share of healing a unit still receives while its healing is cut.
+const HEALING_CUT_SHARE = 0.6
+const MOVE_EPOCH_COUNT = 256
 
 const UnitTypes = require("./UnitTypes")
 
+type DamageKind = UnitTypes.DamageKind
 type Order = UnitTypes.Order
+type StatModifier = UnitTypes.StatModifier
 type Team = UnitTypes.Team
 type Unit = UnitTypes.Unit
 type UnitInfo = UnitTypes.UnitInfo
@@ -49,6 +54,11 @@ export type SpawnOptions = {
 	RemoveOnDeath: boolean?,
 }
 
+export type RootOptions = {
+	-- A root the unit puts on itself, like a channel, ignores its immunity.
+	IsSelfApplied: boolean?,
+}
+
 type Projectile = {
 	SourceId: number,
 	TargetId: number,
@@ -66,6 +76,8 @@ type SentState = {
 	MaxHealth: number,
 	Resource: number,
 	MaxResource: number,
+	Shield: number,
+	Epoch: number,
 	Time: number,
 }
 
@@ -75,8 +87,8 @@ local Module = {}
 
 -- (unit, killer)
 Module.UnitDied = Signal.new() :: Signal.Signal<Unit, Unit?>
--- (target, source, damage after armor)
-Module.UnitDamaged = Signal.new() :: Signal.Signal<Unit, Unit?, number>
+-- (target, source, damage dealt after armor, shield included, kind)
+Module.UnitDamaged = Signal.new() :: Signal.Signal<Unit, Unit?, number, DamageKind>
 Module.UnitRemoved = Signal.new() :: Signal.Signal<Unit>
 
 local random = Random.new()
@@ -121,6 +133,33 @@ local function toInfo(unit: Unit): UnitInfo
 	}
 end
 
+local function recomputeStats(unit: Unit)
+	local active: { StatModifier } = {}
+	for _, timed in unit.Modifiers do
+		table.insert(active, timed.Modifier)
+	end
+
+	local previousMaxHealth = unit.Stats.MaxHealth
+	unit.Stats = CombatRules.applyModifiers(unit.BaseStats, active)
+	if unit.Stats.MaxHealth ~= previousMaxHealth and previousMaxHealth > 0 then
+		-- Keeps the same share of health when max health changes.
+		unit.Health = unit.Health / previousMaxHealth * unit.Stats.MaxHealth
+	end
+end
+
+local function expireModifiers(unit: Unit, now: number)
+	local hasExpired = false
+	for key, timed in unit.Modifiers do
+		if now >= timed.ExpiresAt then
+			unit.Modifiers[key] = nil
+			hasExpired = true
+		end
+	end
+	if hasExpired then
+		recomputeStats(unit)
+	end
+end
+
 local function faceToward(unit: Unit, point: Vector3)
 	local offset = point - unit.Position
 	if offset.X ~= 0 or offset.Z ~= 0 then
@@ -129,30 +168,48 @@ local function faceToward(unit: Unit, point: Vector3)
 end
 
 --[[
-	Moves the unit toward the point for one step and returns true once it is
-	within stopDistance of it.
+	Moves the unit toward the point for one step at the given speed, and
+	returns true once it is within stopDistance of it.
 ]]
-local function moveToward(unit: Unit, point: Vector3, stopDistance: number, dt: number): boolean
+local function moveToward(
+	unit: Unit,
+	point: Vector3,
+	stopDistance: number,
+	speed: number,
+	dt: number
+): boolean
 	local offset = point - unit.Position
 	local distance = offset.Magnitude
 	if distance <= stopDistance then
 		return true
 	end
-	if unit.Stats.MoveSpeed <= 0 then
+	if speed <= 0 then
 		return false
 	end
 
 	local remaining = distance - stopDistance
-	local stepLength = math.min(unit.Stats.MoveSpeed * dt, remaining)
+	local stepLength = math.min(speed * dt, remaining)
 	unit.Position += offset / distance * stepLength
 	unit.Facing = math.atan2(-offset.X, -offset.Z)
 	return stepLength >= remaining
+end
+
+local function clearCombatState(unit: Unit)
+	table.clear(unit.Modifiers)
+	recomputeStats(unit)
+	unit.Shield = 0
+	unit.Dash = nil
+	unit.StunnedUntil = 0
+	unit.RootedUntil = 0
+	unit.HealingCutUntil = 0
+	unit.IsChanneling = false
 end
 
 local function killUnit(unit: Unit, killer: Unit?)
 	unit.IsDead = true
 	unit.Health = 0
 	unit.Order = IDLE_ORDER
+	clearCombatState(unit)
 	Module.UnitDied:Fire(unit, killer)
 	if unit.RemoveOnDeath then
 		Module:RemoveUnit(unit)
@@ -173,14 +230,29 @@ local function performAttack(unit: Unit, target: Unit)
 			Damage = unit.Stats.AttackDamage,
 		})
 	else
-		Module:ApplyDamage(target, unit.Stats.AttackDamage, unit)
+		Module:ApplyDamage(target, unit.Stats.AttackDamage, unit, "Attack")
 	end
 end
 
-local function stepOrder(unit: Unit, dt: number)
+local function stepDash(unit: Unit, dt: number)
+	local dash = unit.Dash
+	if not dash then
+		return
+	end
+	if moveToward(unit, dash.Destination, 0, dash.Speed, dt) then
+		unit.Dash = nil
+		local onArrive = dash.OnArrive
+		if onArrive then
+			task.spawn(onArrive, unit)
+		end
+	end
+end
+
+local function stepOrder(unit: Unit, dt: number, canMove: boolean)
 	local order = unit.Order
+	local speed = if canMove then unit.Stats.MoveSpeed else 0
 	if order.Kind == "Move" then
-		if moveToward(unit, order.Target, 0, dt) then
+		if moveToward(unit, order.Target, 0, speed, dt) then
 			unit.Order = IDLE_ORDER
 		end
 	elseif order.Kind == "Attack" then
@@ -192,11 +264,11 @@ local function stepOrder(unit: Unit, dt: number)
 
 		local reach = unit.Stats.AttackRange + unit.Stats.Radius + target.Stats.Radius
 		if (target.Position - unit.Position).Magnitude > reach then
-			if unit.Stats.MoveSpeed > 0 then
-				moveToward(unit, target.Position, reach, dt)
-			else
+			if unit.BaseStats.MoveSpeed <= 0 then
 				-- A tower can't follow a target out of its range.
 				unit.Order = IDLE_ORDER
+			else
+				moveToward(unit, target.Position, reach, speed, dt)
 			end
 			return
 		end
@@ -219,7 +291,12 @@ local function stepProjectiles(dt: number)
 			local distance = offset.Magnitude
 			local stepLength = projectile.Speed * dt
 			if distance <= stepLength + PROJECTILE_HIT_DISTANCE then
-				Module:ApplyDamage(target, projectile.Damage, unitsById[projectile.SourceId])
+				Module:ApplyDamage(
+					target,
+					projectile.Damage,
+					unitsById[projectile.SourceId],
+					"Attack"
+				)
 				isFinished = true
 			else
 				projectile.Position += offset / distance * stepLength
@@ -242,11 +319,12 @@ end
 --[[
 	Pushes overlapping units apart, so a wave doesn't collapse into one spot.
 	A spatial grid keeps it to each unit's neighbors instead of every pair.
+	Dashing units pass through others.
 ]]
 local function separateUnits()
 	local grid: { [number]: { Unit }? } = {}
 	for _, unit in unitArray do
-		if unit.IsRemoved or unit.IsDead then
+		if unit.IsRemoved or unit.IsDead or unit.Kind == "Summon" then
 			continue
 		end
 		local key = getCellKey(
@@ -262,7 +340,13 @@ local function separateUnits()
 	end
 
 	for _, unit in unitArray do
-		if unit.IsRemoved or unit.IsDead or unit.Stats.MoveSpeed <= 0 then
+		if
+			unit.IsRemoved
+			or unit.IsDead
+			or unit.Dash
+			or unit.Kind == "Summon"
+			or unit.BaseStats.MoveSpeed <= 0
+		then
 			continue
 		end
 
@@ -276,7 +360,7 @@ local function separateUnits()
 					continue
 				end
 				for _, other in cell do
-					if other == unit then
+					if other == unit or other.Dash then
 						continue
 					end
 					local offset = unit.Position - other.Position
@@ -289,7 +373,7 @@ local function separateUnits()
 						then offset / distance
 						else Vector3.new(random:NextNumber(-1, 1), 0, random:NextNumber(-1, 1)).Unit
 					-- A unit that can't move takes none of the push.
-					local share = if other.Stats.MoveSpeed > 0 then 0.5 else 1
+					local share = if other.BaseStats.MoveSpeed > 0 then 0.5 else 1
 					push += direction * (minimumDistance - distance) * share
 				end
 			end
@@ -298,13 +382,19 @@ local function separateUnits()
 	end
 end
 
-local function getFlags(unit: Unit): number
+local function getFlags(unit: Unit, now: number): number
 	local flags = 0
 	if unit.IsDead then
 		flags += UnitSnapshotCodec.Flags.Dead
 	end
 	if not unit.IsTargetable then
 		flags += UnitSnapshotCodec.Flags.Untargetable
+	end
+	if now < unit.StunnedUntil then
+		flags += UnitSnapshotCodec.Flags.Stunned
+	end
+	if now < unit.RootedUntil then
+		flags += UnitSnapshotCodec.Flags.Rooted
 	end
 	return flags
 end
@@ -318,6 +408,8 @@ local function isSameState(sent: SentState, current: SentState): boolean
 		and sent.MaxHealth == current.MaxHealth
 		and sent.Resource == current.Resource
 		and sent.MaxResource == current.MaxResource
+		and sent.Shield == current.Shield
+		and sent.Epoch == current.Epoch
 end
 
 local function sendSnapshots(now: number)
@@ -331,11 +423,13 @@ local function sendSnapshots(now: number)
 			X = UnitSnapshotCodec.quantizePosition(unit.Position.X),
 			Z = UnitSnapshotCodec.quantizePosition(unit.Position.Z),
 			Facing = UnitSnapshotCodec.quantizeFacing(unit.Facing),
-			Flags = getFlags(unit),
+			Flags = getFlags(unit, now),
 			Health = UnitSnapshotCodec.quantizeAmount(unit.Health),
 			MaxHealth = UnitSnapshotCodec.quantizeAmount(unit.Stats.MaxHealth),
 			Resource = UnitSnapshotCodec.quantizeAmount(unit.Resource),
 			MaxResource = UnitSnapshotCodec.quantizeAmount(unit.MaxResource),
+			Shield = UnitSnapshotCodec.quantizeAmount(unit.Shield),
+			Epoch = unit.MoveEpoch,
 			Time = now,
 		}
 		local sent = sentStates[unit.Id]
@@ -354,6 +448,8 @@ local function sendSnapshots(now: number)
 			MaxHealth = unit.Stats.MaxHealth,
 			Resource = unit.Resource,
 			MaxResource = unit.MaxResource,
+			Shield = unit.Shield,
+			Epoch = unit.MoveEpoch,
 		})
 	end
 
@@ -394,6 +490,33 @@ local function runBrain(unit: Unit, brain: (Unit) -> ())
 	end
 end
 
+local function stepUnit(unit: Unit, dt: number, now: number)
+	if next(unit.Modifiers) then
+		expireModifiers(unit, now)
+	end
+	if unit.Shield > 0 and now >= unit.ShieldExpiresAt then
+		unit.Shield = 0
+	end
+	if unit.AttackCooldown > 0 then
+		unit.AttackCooldown = math.max(unit.AttackCooldown - dt, 0)
+	end
+	-- A dash carries the unit through stuns and ignores its orders.
+	if unit.Dash then
+		stepDash(unit, dt)
+		return
+	end
+	if now < unit.StunnedUntil then
+		return
+	end
+
+	local brain = unit.Brain
+	if brain and now >= unit.NextThinkTime then
+		unit.NextThinkTime = now + THINK_INTERVAL
+		runBrain(unit, brain)
+	end
+	stepOrder(unit, dt, now >= unit.RootedUntil)
+end
+
 local function step(frameTime: number)
 	debug.profilebegin("UnitServerService:Step")
 	local dt = math.min(frameTime, MAX_STEP)
@@ -405,19 +528,9 @@ local function step(frameTime: number)
 		local count = #unitArray
 		for index = 1, count do
 			local unit = unitArray[index]
-			if unit.IsRemoved or unit.IsDead then
-				continue
+			if not unit.IsRemoved and not unit.IsDead then
+				stepUnit(unit, dt, now)
 			end
-
-			local brain = unit.Brain
-			if brain and now >= unit.NextThinkTime then
-				unit.NextThinkTime = now + THINK_INTERVAL
-				runBrain(unit, brain)
-			end
-			if unit.AttackCooldown > 0 then
-				unit.AttackCooldown = math.max(unit.AttackCooldown - dt, 0)
-			end
-			stepOrder(unit, dt)
 		end
 
 		stepProjectiles(dt)
@@ -470,18 +583,29 @@ function Module:SpawnUnit(options: SpawnOptions): Unit
 		Kind = options.Kind,
 		TypeId = options.TypeId,
 		Team = options.Team,
-		Stats = options.Stats,
+		BaseStats = options.Stats,
+		Stats = table.clone(options.Stats),
+		Modifiers = {},
 		Position = flatten(options.Position),
 		Facing = 0,
+		MoveEpoch = 0,
 		Health = options.Stats.MaxHealth,
+		Shield = 0,
+		ShieldExpiresAt = 0,
 		Resource = maxResource,
 		MaxResource = maxResource,
 		IsDead = false,
 		IsRemoved = false,
 		IsTargetable = if options.IsTargetable == nil then true else options.IsTargetable,
+		IsChanneling = false,
 		RemoveOnDeath = if options.RemoveOnDeath == nil then true else options.RemoveOnDeath,
 		OwnerPlayer = options.OwnerPlayer,
 		Order = IDLE_ORDER,
+		Dash = nil,
+		StunnedUntil = 0,
+		RootedUntil = 0,
+		CrowdControlImmuneUntil = 0,
+		HealingCutUntil = 0,
 		AttackCooldown = 0,
 		Brain = options.Brain,
 		-- Spread first thinks out, so a whole wave doesn't think on one frame.
@@ -583,22 +707,34 @@ function Module:CanAttack(attacker: Unit, target: Unit): boolean
 		and attacker.Stats.AttackDamage > 0
 end
 
+function Module:IsStunned(unit: Unit): boolean
+	return os.clock() < unit.StunnedUntil
+end
+
 function Module:IssueOrder(unit: Unit, order: Order)
 	unit.Order = order
 end
 
 --[[
-	Deals damage after the target's armor and returns the amount dealt. A
-	dead or untargetable target takes none.
+	Deals damage and returns the amount dealt. Attack and Ability damage are
+	reduced by armor, and a shield absorbs damage before health. A dead or
+	untargetable target takes none.
 ]]
-function Module:ApplyDamage(target: Unit, amount: number, source: Unit?): number
+function Module:ApplyDamage(target: Unit, amount: number, source: Unit?, kind: DamageKind): number
 	if target.IsDead or target.IsRemoved or not target.IsTargetable or amount <= 0 then
 		return 0
 	end
 
-	local dealt = math.min(CombatRules.mitigateDamage(amount, target.Stats.Armor), target.Health)
-	target.Health -= dealt
-	Module.UnitDamaged:Fire(target, source, dealt)
+	local mitigated = if kind == "True"
+		then amount
+		else CombatRules.mitigateDamage(amount, target.Stats.Armor)
+	local absorbed = math.min(target.Shield, mitigated)
+	target.Shield -= absorbed
+	local healthLoss = math.min(mitigated - absorbed, target.Health)
+	target.Health -= healthLoss
+
+	local dealt = absorbed + healthLoss
+	Module.UnitDamaged:Fire(target, source, dealt, kind)
 	if target.Health <= 0 then
 		killUnit(target, source)
 	end
@@ -609,7 +745,12 @@ function Module:Heal(unit: Unit, amount: number)
 	if unit.IsDead or unit.IsRemoved then
 		return
 	end
-	unit.Health = math.min(unit.Health + amount, unit.Stats.MaxHealth)
+	local share = if os.clock() < unit.HealingCutUntil then HEALING_CUT_SHARE else 1
+	unit.Health = math.min(unit.Health + amount * share, unit.Stats.MaxHealth)
+end
+
+function Module:SetResource(unit: Unit, amount: number)
+	unit.Resource = math.clamp(amount, 0, unit.MaxResource)
 end
 
 function Module:RestoreResource(unit: Unit, amount: number)
@@ -619,17 +760,136 @@ function Module:RestoreResource(unit: Unit, amount: number)
 	unit.Resource = math.min(unit.Resource + amount, unit.MaxResource)
 end
 
+--[[
+	Replaces a unit's stats before modifiers, such as on a level up.
+]]
+function Module:SetBaseStats(unit: Unit, stats: UnitStats)
+	unit.BaseStats = stats
+	recomputeStats(unit)
+end
+
+--[[
+	Adds or replaces the modifier under key for duration seconds. Reusing a
+	key refreshes it instead of stacking a second copy.
+]]
+function Module:AddModifier(unit: Unit, key: string, modifier: StatModifier, duration: number)
+	if unit.IsDead or unit.IsRemoved then
+		return
+	end
+	unit.Modifiers[key] = {
+		Modifier = modifier,
+		ExpiresAt = os.clock() + duration,
+	}
+	recomputeStats(unit)
+end
+
+function Module:RemoveModifier(unit: Unit, key: string)
+	if unit.Modifiers[key] then
+		unit.Modifiers[key] = nil
+		recomputeStats(unit)
+	end
+end
+
+--[[
+	Ends every stun, root, and slow on the unit.
+]]
+function Module:ClearImpairments(unit: Unit)
+	unit.StunnedUntil = 0
+	unit.RootedUntil = 0
+	local hasRemoved = false
+	for key, timed in unit.Modifiers do
+		local modifier = timed.Modifier
+		if
+			modifier.Stat == "MoveSpeed"
+			and ((modifier.Multiply or 1) < 1 or (modifier.Add or 0) < 0)
+		then
+			unit.Modifiers[key] = nil
+			hasRemoved = true
+		end
+	end
+	if hasRemoved then
+		recomputeStats(unit)
+	end
+end
+
+function Module:GrantCrowdControlImmunity(unit: Unit, duration: number)
+	unit.CrowdControlImmuneUntil = math.max(unit.CrowdControlImmuneUntil, os.clock() + duration)
+end
+
+function Module:Stun(unit: Unit, duration: number)
+	local now = os.clock()
+	if now < unit.CrowdControlImmuneUntil or unit.IsDead then
+		return
+	end
+	unit.StunnedUntil = math.max(unit.StunnedUntil, now + duration)
+end
+
+function Module:Root(unit: Unit, duration: number, options: RootOptions?)
+	local now = os.clock()
+	local isSelfApplied = options and options.IsSelfApplied
+	if unit.IsDead or (now < unit.CrowdControlImmuneUntil and not isSelfApplied) then
+		return
+	end
+	unit.RootedUntil = math.max(unit.RootedUntil, now + duration)
+end
+
+function Module:CutHealing(unit: Unit, duration: number)
+	unit.HealingCutUntil = math.max(unit.HealingCutUntil, os.clock() + duration)
+end
+
+--[[
+	Adds a shield that absorbs damage for duration seconds. Shields from
+	several sources add up and last as long as the longest one.
+]]
+function Module:AddShield(unit: Unit, amount: number, duration: number)
+	if unit.IsDead or unit.IsRemoved then
+		return
+	end
+	unit.Shield += amount
+	unit.ShieldExpiresAt = math.max(unit.ShieldExpiresAt, os.clock() + duration)
+end
+
+--[[
+	Sends the unit straight to a point at the given speed (studs per second),
+	ignoring its orders, then calls onArrive. The unit is left idle.
+]]
+function Module:Dash(unit: Unit, destination: Vector3, speed: number, onArrive: ((Unit) -> ())?)
+	if unit.IsDead or unit.IsRemoved then
+		return
+	end
+	unit.Order = IDLE_ORDER
+	unit.Dash = {
+		Destination = flatten(destination),
+		Speed = speed,
+		OnArrive = onArrive,
+	}
+end
+
+--[[
+	Moves the unit to a point at once. Clients jump it there instead of
+	sliding it across the map.
+]]
+function Module:Teleport(unit: Unit, position: Vector3)
+	if unit.IsRemoved then
+		return
+	end
+	unit.Position = flatten(position)
+	unit.Dash = nil
+	unit.Order = IDLE_ORDER
+	unit.MoveEpoch = (unit.MoveEpoch + 1) % MOVE_EPOCH_COUNT
+end
+
 function Module:Revive(unit: Unit, position: Vector3)
 	if unit.IsRemoved then
 		return
 	end
 
 	unit.IsDead = false
+	clearCombatState(unit)
 	unit.Health = unit.Stats.MaxHealth
 	unit.Resource = unit.MaxResource
-	unit.Position = flatten(position)
-	unit.Order = IDLE_ORDER
 	unit.AttackCooldown = 0
+	Module:Teleport(unit, position)
 end
 
 function Module:SetTargetable(unit: Unit, isTargetable: boolean)

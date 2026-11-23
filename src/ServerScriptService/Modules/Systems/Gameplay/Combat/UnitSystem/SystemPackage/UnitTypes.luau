@@ -1,7 +1,11 @@
 --!strict
 
 export type Team = "Blue" | "Red" | "Neutral"
-export type UnitKind = "Hero" | "Minion" | "Monster" | "Structure"
+-- A summon is a short-lived helper, like a clone, that fights for its owner.
+export type UnitKind = "Hero" | "Minion" | "Monster" | "Structure" | "Summon"
+-- Attack and Ability damage are reduced by armor; True damage is not.
+export type DamageKind = "Attack" | "Ability" | "True"
+export type StatName = "MoveSpeed" | "AttackDamage" | "AttackInterval" | "Armor"
 
 export type UnitStats = {
 	MaxHealth: number,
@@ -18,6 +22,26 @@ export type UnitStats = {
 	ProjectileSpeed: number?,
 }
 
+-- Changes one stat: Add applies to the base value first, then Multiply.
+export type StatModifier = {
+	Stat: StatName,
+	Add: number?,
+	Multiply: number?,
+}
+
+export type TimedModifier = {
+	Modifier: StatModifier,
+	-- os.clock() time the modifier ends.
+	ExpiresAt: number,
+}
+
+export type Dash = {
+	Destination: Vector3,
+	-- Studs per second.
+	Speed: number,
+	OnArrive: ((Unit) -> ())?,
+}
+
 export type Order =
 	{ Kind: "Idle" }
 	| { Kind: "Move", Target: Vector3 }
@@ -28,20 +52,36 @@ export type Unit = {
 	Kind: UnitKind,
 	TypeId: string,
 	Team: Team,
+	-- Stats before modifiers. Stats holds the values in effect.
+	BaseStats: UnitStats,
 	Stats: UnitStats,
+	Modifiers: { [string]: TimedModifier },
 	-- Always on the ground plane, so Y is zero.
 	Position: Vector3,
 	-- Radians around the vertical axis. Zero faces along -Z.
 	Facing: number,
+	-- Counts teleports (mod 256), so clients jump instead of sliding.
+	MoveEpoch: number,
 	Health: number,
+	Shield: number,
+	ShieldExpiresAt: number,
 	Resource: number,
 	MaxResource: number,
 	IsDead: boolean,
 	IsRemoved: boolean,
 	IsTargetable: boolean,
+	-- Set by whatever runs a channel (a recall, a charged beam), so brains
+	-- leave the unit's orders alone meanwhile.
+	IsChanneling: boolean,
 	RemoveOnDeath: boolean,
 	OwnerPlayer: Player?,
 	Order: Order,
+	Dash: Dash?,
+	-- os.clock() times that crowd control and its immunity end.
+	StunnedUntil: number,
+	RootedUntil: number,
+	CrowdControlImmuneUntil: number,
+	HealingCutUntil: number,
 	-- Seconds until the unit can attack again.
 	AttackCooldown: number,
 	Brain: ((Unit) -> ())?,

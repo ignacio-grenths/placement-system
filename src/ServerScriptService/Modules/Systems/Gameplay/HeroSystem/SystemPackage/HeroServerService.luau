@@ -1,5 +1,6 @@
 --!strict
 
+const Signal = require("@game/ServerScriptService/Modules/Utilities/Signal")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -31,6 +32,10 @@ type Fountain = {
 
 local Module = {}
 
+-- (hero unit, hero id)
+Module.HeroSpawned = Signal.new() :: Signal.Signal<Unit, string>
+Module.HeroRemoved = Signal.new() :: Signal.Signal<Unit>
+
 local definitions: { [string]: HeroDefinition? } = {}
 local fountains: { [Team]: Fountain? } = {}
 local heroes: { [Player]: Unit? } = {}
@@ -40,7 +45,8 @@ local heroes: { [Player]: Unit? } = {}
 	standing in lane never stands still while aliens hit them.
 ]]
 local function heroBrain(hero: Unit)
-	if hero.Order.Kind ~= "Idle" then
+	-- Starting an attack would break a channel such as a recall.
+	if hero.Order.Kind ~= "Idle" or hero.IsChanneling then
 		return
 	end
 
@@ -124,6 +130,7 @@ function Module:SpawnHero(player: Player, heroId: string, team: Team): Unit
 		RemoveOnDeath = false,
 	})
 	heroes[player] = hero
+	Module.HeroSpawned:Fire(hero, heroId)
 	return hero
 end
 
@@ -132,7 +139,16 @@ function Module:RemoveHero(player: Player)
 	if hero then
 		heroes[player] = nil
 		UnitServerService:RemoveUnit(hero)
+		Module.HeroRemoved:Fire(hero)
 	end
+end
+
+--[[
+	Returns where a team's fountain stands, or nil when it has none.
+]]
+function Module:GetFountainPosition(team: Team): Vector3?
+	local fountain = fountains[team]
+	return if fountain then fountain.Position else nil
 end
 
 function Module:GetHero(player: Player): Unit?

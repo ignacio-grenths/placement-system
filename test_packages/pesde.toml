@@ -1,6 +1,7 @@
-# Jest Roblox, mounted at ServerScriptService.Tests.Packages by
-# src/ServerScriptService/Tests/Packages/default.project.json.
-# `pesde install` at the repo root installs this too.
+# Studio-only tooling: Jest Roblox for specs and the UI Labs utilities for
+# stories, mounted at ServerScriptService.Tests.Packages by
+# src/ServerScriptService/Tests/Packages/default.project.json, so none of it
+# ships with the game. `pesde install` at the repo root installs this too.
 name = "local/my_game_test_packages"
 version = "0.0.0"
 private = true
@@ -17,3 +18,4 @@ default = "https://github.com/UpliftGames/wally-index"
 [dependencies]
 Jest = { wally = "roblox/jest", version = "=3.21.0" }
 JestGlobals = { wally = "roblox/jest-globals", version = "=3.21.0" }
+UILabs = { wally = "pepeeltoro41/ui-labs", version = "=2.4.2" }

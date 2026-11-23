@@ -4,7 +4,7 @@
 const MAX_CHUNK_BYTES = 900
 -- An f64 server time and a u16 entry count.
 const HEADER_BYTES = 10
-const ENTRY_BYTES = 16
+const ENTRY_BYTES = 19
 const ENTRIES_PER_CHUNK = (MAX_CHUNK_BYTES - HEADER_BYTES) // ENTRY_BYTES
 -- Positions travel in twentieths of a stud, so a signed 16-bit value covers
 -- 1,638 studs either side of the origin.
@@ -24,6 +24,9 @@ export type Entry = {
 	MaxHealth: number,
 	Resource: number,
 	MaxResource: number,
+	Shield: number,
+	-- The unit's MoveEpoch, 0 to 255.
+	Epoch: number,
 }
 
 local Module = {}
@@ -35,6 +38,8 @@ Module.SendInterval = 1 / 15
 Module.Flags = table.freeze({
 	Dead = 1,
 	Untargetable = 2,
+	Stunned = 4,
+	Rooted = 8,
 })
 
 function Module.quantizePosition(value: number): number
@@ -79,6 +84,8 @@ function Module.encode(serverTime: number, entries: { Entry }): { buffer }
 			buffer.writeu16(payload, offset + 10, Module.quantizeAmount(entry.MaxHealth))
 			buffer.writeu16(payload, offset + 12, Module.quantizeAmount(entry.Resource))
 			buffer.writeu16(payload, offset + 14, Module.quantizeAmount(entry.MaxResource))
+			buffer.writeu16(payload, offset + 16, Module.quantizeAmount(entry.Shield))
+			buffer.writeu8(payload, offset + 18, entry.Epoch % 256)
 			offset += ENTRY_BYTES
 		end
 
@@ -106,6 +113,8 @@ function Module.decode(payload: buffer): (number, { Entry })
 			MaxHealth = buffer.readu16(payload, offset + 10),
 			Resource = buffer.readu16(payload, offset + 12),
 			MaxResource = buffer.readu16(payload, offset + 14),
+			Shield = buffer.readu16(payload, offset + 16),
+			Epoch = buffer.readu8(payload, offset + 18),
 		})
 		offset += ENTRY_BYTES
 	end

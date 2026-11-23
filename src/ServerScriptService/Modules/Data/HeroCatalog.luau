@@ -17,6 +17,15 @@ export type HeroEntry = {
 	Resource: ResourceKind,
 	-- Zero for heroes on cooldowns only.
 	MaxResource: number,
+	-- Per second.
+	ResourceRegen: number,
+	-- Seconds after spending before the resource comes back (stamina).
+	ResourceRegenDelay: number,
+	-- Resource back per basic attack that hits an enemy hero (stamina).
+	ResourceOnHeroHit: number,
+	-- AbilityCatalog ids by slot (Q, W, E, R). Empty until the hero's kit is
+	-- built.
+	Abilities: { [string]: string },
 	Stats: UnitStats,
 	-- Placeholder body color until the hero's model exists.
 	Color: Color3,
@@ -36,6 +45,10 @@ Module.Heroes = {
 		Role = "Mid",
 		Resource = "Energy",
 		MaxResource = 200,
+		ResourceRegen = 10,
+		ResourceRegenDelay = 0,
+		ResourceOnHeroHit = 0,
+		Abilities = { Q = "Haru.Q", W = "Haru.W", E = "Haru.E", R = "Haru.R" },
 		Stats = {
 			MaxHealth = 580,
 			Armor = 26,
@@ -54,6 +67,10 @@ Module.Heroes = {
 		Role = "Bot",
 		Resource = "Mana",
 		MaxResource = 320,
+		ResourceRegen = 4,
+		ResourceRegenDelay = 0,
+		ResourceOnHeroHit = 0,
+		Abilities = { Q = "Ryuka.Q", W = "Ryuka.W", E = "Ryuka.E", R = "Ryuka.R" },
 		Stats = {
 			MaxHealth = 520,
 			Armor = 22,
@@ -73,6 +90,10 @@ Module.Heroes = {
 		Role = "Top",
 		Resource = "Stamina",
 		MaxResource = 100,
+		ResourceRegen = 25,
+		ResourceRegenDelay = 2,
+		ResourceOnHeroHit = 5,
+		Abilities = {},
 		Stats = {
 			MaxHealth = 640,
 			Armor = 30,
@@ -91,6 +112,10 @@ Module.Heroes = {
 		Role = "Jungle",
 		Resource = "Mana",
 		MaxResource = 300,
+		ResourceRegen = 4,
+		ResourceRegenDelay = 0,
+		ResourceOnHeroHit = 0,
+		Abilities = {},
 		Stats = {
 			MaxHealth = 600,
 			Armor = 28,
@@ -109,6 +134,10 @@ Module.Heroes = {
 		Role = "Support",
 		Resource = "None",
 		MaxResource = 0,
+		ResourceRegen = 0,
+		ResourceRegenDelay = 0,
+		ResourceOnHeroHit = 0,
+		Abilities = {},
 		Stats = {
 			MaxHealth = 680,
 			Armor = 34,

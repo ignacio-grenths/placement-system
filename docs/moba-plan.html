@@ -300,7 +300,7 @@ Systems [Folder] | LOAD_MODULE
     + Combat [Folder]
       + UnitSystem [Folder] | M1, unit records, tick, damage, death
       + AbilitySystem [Folder] | M1, cooldowns, resources, skillshots, dashes, buffs
-      + SummonerSpellSystem [Folder] | M1, D and F spells
+      ~ AbilitySystem [Folder] | also runs the D and F summoner spells and recall
     + HeroSystem [Folder] | M1, hero catalog, spawning, kits
     + HeroControlSystem [Folder] | M1, input on all devices to orders
     + MinionWaveSystem [Folder] | M1, alien waves and lane paths
@@ -358,21 +358,21 @@ ID | Item | System | Milestone | Status
 MB-1 | Greybox Crashpoint Valley, drawn on each client from the `MapLayout` data module that every system reads | MapSystem | M1 | [done]
 MB-2 | Unit records, server tick, damage, death, unit spacing. Pathing around jungle walls comes with the walls | UnitSystem | M1 | [progress]
 MB-3 | Snapshot stream at 15 per second, client smoothing, health bars, placeholder models | UnitVisualsSystem | M1 | [done]
-MB-4 | Right-click move and attack, S to stop, tap to move, gamepad stick. QWER and B to recall come with abilities | HeroControlSystem | M1 | [progress]
+MB-4 | Right-click move and attack, S to stop, tap to move, gamepad stick, QWER quick cast, D and F, B to recall. Roblox's thumbstick is off, since heroes walk by tapping | HeroControlSystem, AbilitySystem | M1 | [done]
 MB-5 | Locked overhead camera, Y toggles edge panning on PC, Space to recenter, wheel to zoom | CameraSystem | M1 | [done]
-MB-6 | Cooldowns, mana, skillshots, dashes, shields, and buffs as data plus handlers | AbilitySystem | M1 | [todo]
-MB-7 | Haru and Ryuka with full kits | HeroSystem | M1 | [todo]
+MB-6 | Cooldowns, skillshots, dashes, channels, shields, stuns, roots, slows, and buffs, with every number in `AbilityCatalog` | AbilitySystem | M1 | [done]
+MB-7 | Haru and Ryuka with full kits | AbilitySystem | M1 | [done]
 MB-8 | Towers with target priority, gates that rebuild, cores | StructureSystem | M1 | [done]
 MB-9 | Waves at 1:00 then every 30 s, Grub Tank every third, Mega Zib when a gate is down | MinionWaveSystem | M1 | [done]
 MB-10 | 12 camps, 2 buffs per side, Skyray at 5:00, Hive Queen at 14:00, leashing | JungleSystem | M1 | [todo]
 MB-11 | Experience, levels 1 to 15, ability points, respawn timers | HeroLevelSystem | M1 | [todo]
-MB-31 | Resources: mana, energy, stamina, and cooldowns only | AbilitySystem | M1 | [todo]
-MB-32 | Summoner spells on D and F, with default pairs per hero | SummonerSpellSystem | M1 | [todo]
+MB-31 | Resources: mana, energy, stamina, and cooldowns only | AbilitySystem | M1 | [done]
+MB-32 | All seven summoner spells on D and F, with default pairs per hero. They run as abilities, so no separate system | AbilitySystem | M1 | [done]
 MB-12 | Last-hit, kill, assist, tower, and passive gold | GoldSystem | M1 | [todo]
 MB-13 | Small shop: boots, potions, 6 items, fountain only | ItemShopSystem | M1 | [todo]
 MB-14 | Bots that lane, last-hit, retreat, fight, and take objectives | BotSystem | M1 | [todo]
 MB-15 | Match phases, teams, win on core. The end screen comes with the HUD | MatchSystem | M1 | [progress]
-MB-16 | Ability bar, health and mana, gold, shop panel, minimap, scoreboard | MatchHudSystem | M1 | [todo]
+MB-16 | Ability bar with cooldowns, costs, recall progress, and a touch layout with drag to aim [done]. Still to come: health and mana, gold, shop panel, minimap, scoreboard | MatchHudSystem | M1 | [progress]
 MB-17 | Specs for wave timing and makeup, and damage after armor. Gold and level curves follow with MB-11 and MB-12 | Tests | M1 | [done]
 MB-18 | Torvik, Seo Dan with shadow soldiers, Brakk with Colossus Form | HeroSystem | M2 | [todo]
 MB-19 | Team vision, fog drawing, bushes, hidden enemies left out of snapshots | VisionSystem | M2 | [todo]

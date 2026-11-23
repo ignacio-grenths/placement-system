@@ -47,12 +47,18 @@ export type VisualSpec = {
 	HasTeamRing: boolean?,
 	-- Studs per second of the unit's attack shots. Nil for melee units.
 	ProjectileSpeed: number?,
+	-- Of the body. Zero when nil.
+	Transparency: number?,
+	-- Hides the health bar, for units that can never be hit, like a clone.
+	HidesHealthBar: boolean?,
 }
 
 type Visual = {
 	Unit: ClientUnit,
 	Body: BasePart,
 	Parts: { BasePart },
+	BodyTransparency: number,
+	HasHealthBar: boolean,
 	Rotation: CFrame,
 	HeightOffset: number,
 	HealthBar: BillboardGui,
@@ -96,6 +102,7 @@ local function createBody(spec: VisualSpec, color: Color3): (BasePart, CFrame)
 	body.CanTouch = false
 	body.Material = Enum.Material.SmoothPlastic
 	body.Color = color
+	body.Transparency = spec.Transparency or 0
 
 	if spec.Shape == "Ball" then
 		body.Shape = Enum.PartType.Ball
@@ -189,11 +196,15 @@ local function addVisual(unit: ClientUnit)
 		table.insert(parts, createTeamRing(unit, body, spec))
 	end
 	local healthBar, healthFill = createHealthBar(unit, body, spec)
+	local hasHealthBar = not spec.HidesHealthBar
+	healthBar.Enabled = hasHealthBar
 
 	visuals[unit.Id] = {
 		Unit = unit,
 		Body = body,
 		Parts = parts,
+		BodyTransparency = body.Transparency,
+		HasHealthBar = hasHealthBar,
 		Rotation = rotation,
 		HeightOffset = spec.Size.Y / 2,
 		HealthBar = healthBar,
@@ -217,9 +228,12 @@ end
 local function showDead(visual: Visual, isDead: boolean)
 	visual.IsShownDead = isDead
 	for _, part in visual.Parts do
-		part.Transparency = if isDead then 1 else 0
+		part.Transparency = if isDead
+			then 1
+			elseif part == visual.Body then visual.BodyTransparency
+			else 0
 	end
-	visual.HealthBar.Enabled = not isDead
+	visual.HealthBar.Enabled = visual.HasHealthBar and not isDead
 end
 
 local function createShotPart(): BasePart

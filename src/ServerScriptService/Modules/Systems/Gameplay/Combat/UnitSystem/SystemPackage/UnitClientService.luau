@@ -38,8 +38,13 @@ export type ClientUnit = {
 	MaxHealth: number,
 	Resource: number,
 	MaxResource: number,
+	Shield: number,
 	IsDead: boolean,
 	IsTargetable: boolean,
+	IsStunned: boolean,
+	IsRooted: boolean,
+	-- The server's MoveEpoch from the last snapshot, or -1 before the first.
+	Epoch: number,
 	-- Server-time samples, oldest first. Never empty.
 	Samples: { Sample },
 }
@@ -101,8 +106,12 @@ local function onUnitsAdded(infos: { UnitInfo })
 			MaxHealth = info.MaxHealth,
 			Resource = 0,
 			MaxResource = 0,
+			Shield = 0,
 			IsDead = false,
 			IsTargetable = true,
+			IsStunned = false,
+			IsRooted = false,
+			Epoch = -1,
 			-- Time zero sorts before any snapshot, so the first snapshot
 			-- blends from the spawn point.
 			Samples = {
@@ -143,20 +152,25 @@ local function onSnapshot(payload: buffer)
 			continue
 		end
 
-		local isDead = bit32.btest(entry.Flags, UnitSnapshotCodec.Flags.Dead)
-		local isRevived = unit.IsDead and not isDead
-		unit.IsDead = isDead
+		-- A new epoch means the server teleported the unit (a blink, a recall,
+		-- a revive), so it jumps instead of sliding across the map.
+		local isTeleport = unit.Epoch >= 0 and entry.Epoch ~= unit.Epoch
+		unit.Epoch = entry.Epoch
+		unit.IsDead = bit32.btest(entry.Flags, UnitSnapshotCodec.Flags.Dead)
 		unit.IsTargetable = not bit32.btest(entry.Flags, UnitSnapshotCodec.Flags.Untargetable)
+		unit.IsStunned = bit32.btest(entry.Flags, UnitSnapshotCodec.Flags.Stunned)
+		unit.IsRooted = bit32.btest(entry.Flags, UnitSnapshotCodec.Flags.Rooted)
 		unit.Health = entry.Health
 		unit.MaxHealth = entry.MaxHealth
 		unit.Resource = entry.Resource
 		unit.MaxResource = entry.MaxResource
+		unit.Shield = entry.Shield
 
 		addSample(unit, {
 			Time = serverTime,
 			Position = Vector3.new(entry.X, 0, entry.Z),
 			Facing = entry.Facing,
-		}, isRevived)
+		}, isTeleport)
 	end
 end
 
