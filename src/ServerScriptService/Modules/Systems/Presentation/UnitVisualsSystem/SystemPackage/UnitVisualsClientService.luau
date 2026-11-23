@@ -25,6 +25,8 @@ const RING_THICKNESS = 0.2
 const RING_PADDING = 1.5
 -- Studs units stand above the ground, clear of the map's flat markings.
 const GROUND_CLEARANCE = 0.3
+-- How much bigger an enlarged unit is drawn.
+const ENLARGED_SCALE = 1.6
 -- Radians per second of a floating unit's bob.
 const BOB_SPEED = 3
 const SHOT_SIZE = 0.8
@@ -100,6 +102,7 @@ type Visual = {
 	ShownHealth: number,
 	IsShownDead: boolean,
 	IsShownTargetable: boolean,
+	IsShownEnlarged: boolean,
 }
 
 type Shot = {
@@ -128,6 +131,7 @@ local spareShotParts: { BasePart } = {}
 local folder: Folder? = nil
 local movedParts: { BasePart } = {}
 local movedCFrames: { CFrame } = {}
+local resizedUnits: { ClientUnit } = {}
 
 local function shade(color: Color3, amount: number): Color3
 	return color:Lerp(BLACK, amount)
@@ -495,8 +499,13 @@ local function attach(part: BasePart, body: BasePart)
 	part.Parent = body
 end
 
-local function createRing(unit: ClientUnit, spec: VisualSpec, color: Color3): BasePart
-	local diameter = unit.Radius * 2 + RING_PADDING
+local function createRing(
+	unit: ClientUnit,
+	spec: VisualSpec,
+	color: Color3,
+	scale: number
+): BasePart
+	local diameter = (unit.Radius * 2 + RING_PADDING) * scale
 	return createPart({
 		Shape = "Cylinder",
 		Size = Vector3.new(diameter, RING_THICKNESS, diameter),
@@ -549,7 +558,11 @@ local function addVisual(unit: ClientUnit)
 		return
 	end
 
-	local spec = specs[unit.TypeId] or DEFAULT_SPEC
+	local baseSpec = specs[unit.TypeId] or DEFAULT_SPEC
+	-- An enlarged unit is the same build at a bigger size.
+	local scale = if unit.IsEnlarged then ENLARGED_SCALE else 1
+	local spec = table.clone(baseSpec)
+	spec.Size = baseSpec.Size * scale
 	local teamColor = teamColors[unit.Team]
 	local color = spec.Color or teamColor
 	local transparency = spec.Transparency or 0
@@ -571,7 +584,8 @@ local function addVisual(unit: ClientUnit)
 		table.insert(parts, part)
 	end
 	if spec.HasTeamRing then
-		local ring = createRing(unit, spec, if spec.Style == "Beast" then color else teamColor)
+		local ringColor = if spec.Style == "Beast" then color else teamColor
+		local ring = createRing(unit, spec, ringColor, scale)
 		attach(ring, body)
 		table.insert(parts, ring)
 	end
@@ -601,6 +615,7 @@ local function addVisual(unit: ClientUnit)
 		ShownHealth = 1,
 		IsShownDead = false,
 		IsShownTargetable = true,
+		IsShownEnlarged = unit.IsEnlarged,
 	}
 	body.Parent = visualFolder
 end
@@ -729,9 +744,19 @@ local function render(deltaTime: number)
 				then 0
 				else UNTARGETABLE_FILL_TRANSPARENCY
 		end
+		if unit.IsEnlarged ~= visual.IsShownEnlarged then
+			table.insert(resizedUnits, unit)
+		end
 	end
 
 	workspace:BulkMoveTo(movedParts, movedCFrames, Enum.BulkMoveMode.FireCFrameChanged)
+	-- A unit that grew or shrank is built again at its new size, after the
+	-- loop, since rebuilding changes the table the loop walks.
+	for _, unit in resizedUnits do
+		removeVisual(unit)
+		addVisual(unit)
+	end
+	table.clear(resizedUnits)
 	stepShots(deltaTime, renderTime)
 	debug.profileend()
 end

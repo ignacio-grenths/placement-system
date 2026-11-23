@@ -99,6 +99,11 @@ export type Unit = {
 	RootedUntil: number,
 	CrowdControlImmuneUntil: number,
 	HealingCutUntil: number,
+	-- Attack and Ability hits the unit still shrugs off before BlockUntil.
+	BlockedHits: number,
+	BlockUntil: number,
+	-- Grown huge, as clients draw it.
+	IsEnlarged: boolean,
 	-- Seconds until the unit can attack again.
 	AttackCooldown: number,
 	Brain: ((Unit) -> ())?,

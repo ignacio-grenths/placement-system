@@ -21,14 +21,21 @@ local function isAbilityTarget(caster: Unit, other: Unit): boolean
 end
 
 --[[
+	Returns every enemy unit (not structures) whose edge is within radius of
+	the center.
+]]
+function Module.findEnemiesAround(caster: Unit, center: Vector3, radius: number): { Unit }
+	return UnitServerService:FindInRadius(center, radius, function(other)
+		return isAbilityTarget(caster, other)
+	end)
+end
+
+--[[
 	Deals ability damage to every enemy unit (not structures) whose edge is
 	within radius of the center.
 ]]
 function Module.damageAround(caster: Unit, center: Vector3, radius: number, damage: number)
-	local targets = UnitServerService:FindInRadius(center, radius, function(other)
-		return isAbilityTarget(caster, other)
-	end)
-	for _, target in targets do
+	for _, target in Module.findEnemiesAround(caster, center, radius) do
 		UnitServerService:ApplyDamage(target, damage, caster, "Ability")
 	end
 end

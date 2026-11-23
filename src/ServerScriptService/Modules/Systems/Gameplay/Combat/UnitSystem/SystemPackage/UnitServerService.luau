@@ -101,6 +101,8 @@ Module.UnitDied = Signal.new() :: Signal.Signal<Unit, Unit?>
 -- (target, source, damage dealt after armor, shield included, kind)
 Module.UnitDamaged = Signal.new() :: Signal.Signal<Unit, Unit?, number, DamageKind>
 Module.UnitRemoved = Signal.new() :: Signal.Signal<Unit>
+-- (unit that blocked, source of the blocked hit)
+Module.HitBlocked = Signal.new() :: Signal.Signal<Unit, Unit?>
 
 local random = Random.new()
 local unitsById: { [number]: Unit? } = {}
@@ -257,6 +259,8 @@ local function clearCombatState(unit: Unit)
 	unit.StunnedUntil = 0
 	unit.RootedUntil = 0
 	unit.HealingCutUntil = 0
+	unit.BlockedHits = 0
+	unit.IsEnlarged = false
 	unit.IsChanneling = false
 end
 
@@ -461,6 +465,9 @@ local function getFlags(unit: Unit, now: number): number
 	end
 	if now < unit.RootedUntil then
 		flags += UnitSnapshotCodec.Flags.Rooted
+	end
+	if unit.IsEnlarged then
+		flags += UnitSnapshotCodec.Flags.Enlarged
 	end
 	return flags
 end
@@ -672,6 +679,9 @@ function Module:SpawnUnit(options: SpawnOptions): Unit
 		RootedUntil = 0,
 		CrowdControlImmuneUntil = 0,
 		HealingCutUntil = 0,
+		BlockedHits = 0,
+		BlockUntil = 0,
+		IsEnlarged = false,
 		AttackCooldown = 0,
 		Path = nil,
 		PathGoal = nil,
@@ -809,6 +819,11 @@ function Module:ApplyDamage(target: Unit, amount: number, source: Unit?, kind: D
 	if target.IsDead or target.IsRemoved or not target.IsTargetable or amount <= 0 then
 		return 0
 	end
+	if kind ~= "True" and target.BlockedHits > 0 and os.clock() < target.BlockUntil then
+		target.BlockedHits -= 1
+		Module.HitBlocked:Fire(target, source)
+		return 0
+	end
 
 	local amplified = if kind == "Ability" and source
 		then CombatRules.amplifyAbilityDamage(amount, source.Stats.AbilityPower)
@@ -930,6 +945,26 @@ function Module:Root(unit: Unit, duration: number, options: RootOptions?)
 		return
 	end
 	unit.RootedUntil = math.max(unit.RootedUntil, now + duration)
+end
+
+--[[
+	Makes the unit shrug off its next few Attack and Ability hits for
+	duration seconds, firing HitBlocked for each. True damage still lands.
+]]
+function Module:BlockHits(unit: Unit, hits: number, duration: number)
+	if unit.IsDead or unit.IsRemoved then
+		return
+	end
+	unit.BlockedHits = hits
+	unit.BlockUntil = os.clock() + duration
+end
+
+--[[
+	Grows the unit huge on every client, or back to its size. It changes how
+	the unit looks, not its footprint.
+]]
+function Module:SetEnlarged(unit: Unit, isEnlarged: boolean)
+	unit.IsEnlarged = isEnlarged
 end
 
 function Module:CutHealing(unit: Unit, duration: number)

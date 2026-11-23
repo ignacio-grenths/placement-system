@@ -23,8 +23,7 @@ export type HeroEntry = {
 	ResourceRegenDelay: number,
 	-- Resource back per basic attack that hits an enemy hero (stamina).
 	ResourceOnHeroHit: number,
-	-- AbilityCatalog ids by slot (Q, W, E, R). Empty until the hero's kit is
-	-- built.
+	-- AbilityCatalog ids by slot (Q, W, E, R).
 	Abilities: { [string]: string },
 	-- Basic abilities to rank up first when ranks are chosen automatically.
 	-- R always goes first when it can.
@@ -109,7 +108,7 @@ Module.Heroes = {
 		ResourceRegen = 25,
 		ResourceRegenDelay = 2,
 		ResourceOnHeroHit = 5,
-		Abilities = {},
+		Abilities = { Q = "Torvik.Q", W = "Torvik.W", E = "Torvik.E", R = "Torvik.R" },
 		Stats = {
 			MaxHealth = 640,
 			Armor = 30,
@@ -134,7 +133,7 @@ Module.Heroes = {
 		ResourceRegen = 4,
 		ResourceRegenDelay = 0,
 		ResourceOnHeroHit = 0,
-		Abilities = {},
+		Abilities = { Q = "SeoDan.Q", W = "SeoDan.W", E = "SeoDan.E", R = "SeoDan.R" },
 		Stats = {
 			MaxHealth = 600,
 			Armor = 28,
@@ -158,7 +157,7 @@ Module.Heroes = {
 		ResourceRegen = 0,
 		ResourceRegenDelay = 0,
 		ResourceOnHeroHit = 0,
-		Abilities = {},
+		Abilities = { Q = "Brakk.Q", W = "Brakk.W", E = "Brakk.E", R = "Brakk.R" },
 		Stats = {
 			MaxHealth = 680,
 			Armor = 34,

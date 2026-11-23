@@ -43,6 +43,7 @@ export type ClientUnit = {
 	IsTargetable: boolean,
 	IsStunned: boolean,
 	IsRooted: boolean,
+	IsEnlarged: boolean,
 	-- The server's MoveEpoch from the last snapshot, or -1 before the first.
 	Epoch: number,
 	-- Server-time samples, oldest first. Never empty.
@@ -111,6 +112,7 @@ local function onUnitsAdded(infos: { UnitInfo })
 			IsTargetable = true,
 			IsStunned = false,
 			IsRooted = false,
+			IsEnlarged = false,
 			Epoch = -1,
 			-- Time zero sorts before any snapshot, so the first snapshot
 			-- blends from the spawn point.
@@ -160,6 +162,7 @@ local function onSnapshot(payload: buffer)
 		unit.IsTargetable = not bit32.btest(entry.Flags, UnitSnapshotCodec.Flags.Untargetable)
 		unit.IsStunned = bit32.btest(entry.Flags, UnitSnapshotCodec.Flags.Stunned)
 		unit.IsRooted = bit32.btest(entry.Flags, UnitSnapshotCodec.Flags.Rooted)
+		unit.IsEnlarged = bit32.btest(entry.Flags, UnitSnapshotCodec.Flags.Enlarged)
 		unit.Health = entry.Health
 		unit.MaxHealth = entry.MaxHealth
 		unit.Resource = entry.Resource

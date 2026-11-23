@@ -40,6 +40,8 @@ Module.Flags = table.freeze({
 	Untargetable = 2,
 	Stunned = 4,
 	Rooted = 8,
+	-- Grown huge, like Brakk in Colossus Form.
+	Enlarged = 16,
 })
 
 function Module.quantizePosition(value: number): number
