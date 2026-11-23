@@ -15,6 +15,7 @@ function Module:Init()
 	VisionClientService:Configure({
 		Extent = MapLayout.HalfSize + FOG_MARGIN,
 		Brushes = MapLayout.Brushes,
+		Walls = MapLayout.Walls,
 		SightByKind = VisionCatalog.SightByKind,
 		Color = VisionCatalog.FogColor,
 		Opacity = VisionCatalog.FogOpacity,

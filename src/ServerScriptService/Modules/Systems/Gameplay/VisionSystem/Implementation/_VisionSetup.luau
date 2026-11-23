@@ -16,6 +16,7 @@ local Module = {}
 
 function Module:Init()
 	VisionServerService:SetBrushes(MapLayout.Brushes)
+	VisionServerService:SetWalls(MapLayout.Walls)
 	for kind, studs in VisionCatalog.SightByKind do
 		-- Annotated because luau-lsp types a loop key over string literals as string.
 		local unitKind: UnitTypes.UnitKind = kind :: UnitTypes.UnitKind

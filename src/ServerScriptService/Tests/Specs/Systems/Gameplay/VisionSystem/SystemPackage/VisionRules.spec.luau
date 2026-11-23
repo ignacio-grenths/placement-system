@@ -72,6 +72,41 @@ describe("VisionRules", function()
 		},
 	}
 
+	-- A wall across the open ground between the two brush patches.
+	local walls: { VisionRules.Wall } = {
+		{ From = Vector3.new(20, 0, -10), To = Vector3.new(20, 0, 10), Radius = 1 },
+	}
+	local wallRows: { SightRow } = {
+		{
+			Case = "a wall between viewer and spot hides it",
+			ViewerPosition = Vector3.new(14, 0, 0),
+			Spot = Vector3.new(26, 0, 0),
+			Expected = false,
+		},
+		{
+			Case = "a line past the wall's round end is clear",
+			ViewerPosition = Vector3.new(14, 0, 13),
+			Spot = Vector3.new(26, 0, 13),
+			Expected = true,
+		},
+		{
+			Case = "a line grazing the wall's round end is blocked",
+			ViewerPosition = Vector3.new(14, 0, 10.5),
+			Spot = Vector3.new(26, 0, 10.5),
+			Expected = false,
+		},
+	}
+
+	it.each(wallRows)("lets walls block sight: $Case", function(row: SightRow)
+		local viewers: { VisionRules.Viewer } = {
+			{ Position = row.ViewerPosition, Sight = 25, Brush = nil },
+		}
+
+		local isSeen = VisionRules.canSee(viewers, row.Spot, nil, walls)
+
+		expect(isSeen).toBe(row.Expected)
+	end)
+
 	it.each(rows)("decides what a viewer sees: $Case", function(row: SightRow)
 		local viewers: { VisionRules.Viewer } = {
 			{

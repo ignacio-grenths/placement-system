@@ -26,6 +26,7 @@ const SIGHTED_TEAMS: { Team } = { "Blue", "Red" }
 local Module = {}
 
 local brushes: { Brush } = {}
+local walls: { VisionRules.Wall } = {}
 local sightByKind: { [UnitKind]: number? } = {}
 local alwaysSeenKinds: { [UnitKind]: boolean? } = {}
 local damageRevealSeconds = 0
@@ -82,7 +83,7 @@ local function rebuild()
 			if
 				alwaysSeenKinds[unit.Kind]
 				or isRevealed(unit, team, now)
-				or VisionRules.canSee(viewers, unit.Position, unitBrushes[unit])
+				or VisionRules.canSee(viewers, unit.Position, unitBrushes[unit], walls)
 			then
 				seen[unit] = true
 			end
@@ -125,6 +126,13 @@ end
 ]]
 function Module:SetBrushes(newBrushes: { Brush })
 	brushes = table.clone(newBrushes)
+end
+
+--[[
+	Sets the walls that block sight: nobody sees past one.
+]]
+function Module:SetWalls(newWalls: { VisionRules.Wall })
+	walls = table.clone(newWalls)
 end
 
 --[[
@@ -177,7 +185,7 @@ function Module:IsPointVisibleTo(position: Vector3, team: Team): boolean
 	if not viewers then
 		return true
 	end
-	return VisionRules.canSee(viewers, position, VisionRules.findBrush(brushes, position))
+	return VisionRules.canSee(viewers, position, VisionRules.findBrush(brushes, position), walls)
 end
 
 --[[
