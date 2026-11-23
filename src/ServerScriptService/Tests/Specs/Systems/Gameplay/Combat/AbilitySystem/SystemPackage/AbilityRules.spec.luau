@@ -119,6 +119,13 @@ describe("AbilityRules", function()
 			Expected = false,
 		},
 		{
+			Case = "enemy units: an enemy ward",
+			Filter = "EnemyUnit",
+			Team = "Red",
+			Kind = "Ward",
+			Expected = false,
+		},
+		{
 			Case = "enemy units: an allied alien",
 			Filter = "EnemyUnit",
 			Team = "Blue",

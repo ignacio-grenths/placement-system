@@ -70,9 +70,12 @@ end
 local function towerBrain(tower: Unit)
 	local now = SimClock.now()
 	local reach = tower.Stats.AttackRange + tower.Stats.Radius
-	-- Towers leave jungle monsters to the heroes who pulled them.
+	-- Towers leave jungle monsters to the heroes who pulled them, and wards
+	-- to heroes too.
 	local enemies = UnitServerService:FindInRadius(tower.Position, reach, function(other)
-		return other.Kind ~= "Monster" and UnitServerService:CanAttack(tower, other)
+		return other.Kind ~= "Monster"
+			and other.Kind ~= "Ward"
+			and UnitServerService:CanAttack(tower, other)
 	end)
 
 	local candidates: { StructureRules.TargetCandidate } = table.create(#enemies)

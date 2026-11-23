@@ -67,7 +67,10 @@ function Module.matchesFilter(
 ): boolean
 	local isEnemy = targetTeam ~= casterTeam
 	if filter == "EnemyUnit" then
-		return isEnemy and targetKind ~= "Structure" and targetKind ~= "Summon"
+		return isEnemy
+			and targetKind ~= "Structure"
+			and targetKind ~= "Summon"
+			and targetKind ~= "Ward"
 	elseif filter == "EnemyHero" then
 		return isEnemy and targetKind == "Hero"
 	elseif filter == "EnemyNonHero" then

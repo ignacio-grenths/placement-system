@@ -14,6 +14,7 @@ Module.SightByKind = {
 	Minion = 34,
 	Structure = 42,
 	Summon = 24,
+	Ward = 30,
 } :: { [UnitTypes.UnitKind]: number }
 
 -- Seconds a hero stays seen by the team of an enemy hero it damages.

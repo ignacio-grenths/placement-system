@@ -45,7 +45,8 @@ local botHeroes: { Unit } = {}
 
 --[[
 	An idle hero attacks the nearest enemy already in reach, so a player
-	standing in lane never stands still while aliens hit them.
+	standing in lane never stands still while aliens hit them. Wards are left
+	for the player to clear on purpose.
 ]]
 local function heroBrain(hero: Unit)
 	-- Starting an attack would break a channel such as a recall.
@@ -57,7 +58,7 @@ local function heroBrain(hero: Unit)
 		hero.Position,
 		hero.Stats.AttackRange + hero.Stats.Radius,
 		function(other)
-			return UnitServerService:CanAttack(hero, other)
+			return other.Kind ~= "Ward" and UnitServerService:CanAttack(hero, other)
 		end
 	)
 	if target then

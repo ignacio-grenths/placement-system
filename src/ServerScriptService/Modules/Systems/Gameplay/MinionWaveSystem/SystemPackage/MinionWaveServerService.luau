@@ -59,8 +59,10 @@ local function getLaneKey(team: Team, laneName: string): string
 end
 
 local function isLaneEnemy(minion: Unit, other: Unit): boolean
-	-- Aliens fight the other team, never the jungle's monsters.
-	return other.Kind ~= "Monster" and UnitServerService:CanAttack(minion, other)
+	-- Aliens fight the other team, but never jungle monsters or wards.
+	return other.Kind ~= "Monster"
+		and other.Kind ~= "Ward"
+		and UnitServerService:CanAttack(minion, other)
 end
 
 --[[

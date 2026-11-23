@@ -11,8 +11,8 @@ export type ResourceKind = "Mana" | "Energy" | "Stamina" | "None"
 -- Direction: fired along a line. Point: lands on a spot within range.
 -- Unit: needs a target that passes TargetFilter. Self: no aim at all.
 export type Targeting = "Direction" | "Point" | "Unit" | "Self"
--- EnemyUnit leaves out structures. AllyUnit means an allied tower, gate,
--- core, or alien.
+-- EnemyUnit leaves out structures, summons, and wards. AllyUnit means an
+-- allied tower, gate, core, or alien.
 export type TargetFilter = "EnemyUnit" | "EnemyHero" | "EnemyNonHero" | "AllyUnit"
 
 -- What a client is told about an ability in its hero's loadout.

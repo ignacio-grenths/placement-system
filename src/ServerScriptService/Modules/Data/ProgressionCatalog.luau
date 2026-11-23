@@ -53,6 +53,7 @@ Module.UnitRewards = {
 	EmberBeetle = { Gold = 100, Xp = 200 },
 	Skyray = { Gold = 150, Xp = 300 },
 	HiveQueen = { Gold = 300, Xp = 500 },
+	SensorWard = { Gold = 30, Xp = 0 },
 } :: { [string]: UnitReward? }
 
 -- Ability ranks: Q, W, and E go to 4, R to 3, and R can rank up only at

@@ -134,7 +134,7 @@ local lastUnitId = 0
 local snapshotTimer = 0
 local separationTimer = 0
 local navigation: Navigation.Navigation? = nil
--- Living units that never move, which walkers steer around. Rebuilt each step.
+-- Living structures, which walkers steer around. Rebuilt each step.
 local obstacles: { Unit } = {}
 local shieldModifier: ((Unit, number, Unit?) -> number)? = nil
 local visibility: Visibility? = nil
@@ -459,12 +459,13 @@ end
 --[[
 	Pushes overlapping units apart, so a wave doesn't collapse into one spot.
 	A spatial grid keeps it to each unit's neighbors instead of every pair.
-	Dashing units pass through others.
+	Dashing units pass through others, and anything walks through summons and
+	wards.
 ]]
 local function separateUnits()
 	local grid: { [number]: { Unit }? } = {}
 	for _, unit in unitArray do
-		if unit.IsRemoved or unit.IsDead or unit.Kind == "Summon" then
+		if unit.IsRemoved or unit.IsDead or unit.Kind == "Summon" or unit.Kind == "Ward" then
 			continue
 		end
 		local key = getCellKey(
@@ -763,7 +764,7 @@ local function step(frameTime: number)
 	if not isPaused then
 		table.clear(obstacles)
 		for _, unit in unitArray do
-			if unit.BaseStats.MoveSpeed <= 0 and not unit.IsDead and not unit.IsRemoved then
+			if unit.Kind == "Structure" and not unit.IsDead and not unit.IsRemoved then
 				table.insert(obstacles, unit)
 			end
 		end
