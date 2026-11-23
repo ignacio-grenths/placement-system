@@ -289,6 +289,33 @@ Module.Heroes = {
 		SummonerSpells = { "Blink", "Mend" },
 		SuggestedBuild = { "SwiftBoots", "BountyScope", "TrackersCloak", "EchoBlade" },
 	},
+	-- Range and healing in place of Brakk's health and armor.
+	Mio = {
+		DisplayName = "Mio",
+		Title = "the Shrine Maiden",
+		Role = "Support",
+		Resource = "Mana",
+		MaxResource = 340,
+		ResourceRegen = 5,
+		ResourceRegenDelay = 0,
+		ResourceOnHeroHit = 0,
+		Abilities = { Q = "Mio.Q", W = "Mio.W", E = "Mio.E", R = "Mio.R" },
+		Stats = {
+			MaxHealth = 560,
+			Armor = 24,
+			AttackDamage = 50,
+			AttackRange = 12,
+			AttackInterval = 1.6,
+			MoveSpeed = 15.5,
+			Radius = 1.3,
+			ProjectileSpeed = 55,
+		},
+		Color = Color3.fromRGB(220, 50, 60),
+		SkillOrder = { "W", "Q", "E" },
+		Growth = { MaxHealth = 82, Armor = 3.2, AttackDamage = 2.4, MaxResource = 30 },
+		SummonerSpells = { "Blink", "Mend" },
+		SuggestedBuild = { "SwiftBoots", "MendersCharm", "StarfallPendant", "KiConduit" },
+	},
 } :: { [string]: HeroEntry }
 
 return Module

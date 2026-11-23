@@ -992,6 +992,99 @@ local function kenji(): RigSpec
 	}
 end
 
+-- The Shrine Maiden: long black hair cut straight across the brow and tied
+-- with a red bow, a white top with wide sleeves, a long red skirt, and a
+-- wand hung with paper streamers.
+local function mio(): RigSpec
+	local hair = Color3.fromRGB(24, 20, 30)
+	local white = Color3.fromRGB(246, 244, 240)
+	local red = Color3.fromRGB(204, 34, 46)
+	local sideLock =
+		lock(hair, Vector3.new(-0.72, 0.3, -0.12), Vector3.new(-0.76, -1.3, -0.3), 0.34)
+	local bowLoop: PartPlan = {
+		Shape = "Ellipsoid",
+		Size = Vector3.new(0.62, 0.36, 0.24),
+		Offset = CFrame.new(-0.36, 0.32, 0.8) * CFrame.Angles(0, 0, 0.4),
+		Color = red,
+	}
+	local head: { PartPlan } = {
+		hairCap(hair),
+		{
+			Shape = "Ellipsoid",
+			Size = Vector3.new(1.5, 0.5, 0.5),
+			Offset = CFrame.new(0, 0.5, -0.5),
+			Color = hair,
+		},
+		lock(hair, Vector3.new(0, 0.2, 0.6), Vector3.new(0, -2.2, 0.78), 1.05),
+		sideLock,
+		mirrored(sideLock),
+		bowLoop,
+		mirrored(bowLoop),
+		{
+			Shape = "Ball",
+			Size = Vector3.one * 0.24,
+			Offset = CFrame.new(0, 0.32, 0.84),
+			Color = red,
+		},
+	}
+	local torso: { PartPlan } = {
+		{
+			Shape = "Block",
+			Size = Vector3.new(1.7, 1.9, 1.05),
+			Offset = CFrame.new(0, -1.6, 0),
+			Color = red,
+			Material = Enum.Material.Fabric,
+		},
+		belt(red),
+		{
+			Shape = "Block",
+			Size = Vector3.new(0.5, 0.36, 0.06),
+			Offset = CFrame.new(0, 0.66, -0.42) * CFrame.Angles(0, 0, math.pi / 4),
+			Color = red,
+		},
+	}
+	local sleeve: PartPlan = {
+		Shape = "Block",
+		Size = Vector3.new(0.82, 0.95, 0.78),
+		Offset = CFrame.new(0, -0.3, 0.05),
+		Color = white,
+		Material = Enum.Material.Fabric,
+	}
+	local wand: { PartPlan } = {
+		sleeve,
+		{
+			Shape = "Block",
+			Size = Vector3.new(0.08, 1.6, 0.08),
+			Offset = CFrame.new(0, -0.6, -0.25),
+			Color = Color3.fromRGB(150, 110, 70),
+		},
+	}
+	for index, roll in { 0.5, -0.5, 0.5, -0.5 } do
+		local side = if index % 2 == 0 then 1 else -1
+		table.insert(wand, {
+			Shape = "Block",
+			Size = Vector3.new(0.06, 0.26, 0.2),
+			Offset = CFrame.new(side * 0.1, 0.2 - index * 0.17, -0.25) * CFrame.Angles(0, 0, roll),
+			Color = white,
+		})
+	end
+	return {
+		SkinColor = Color3.fromRGB(252, 230, 214),
+		HairColor = hair,
+		EyeColor = Color3.fromRGB(200, 60, 80),
+		TopColor = white,
+		BottomColor = red,
+		ShoeColor = Color3.fromRGB(240, 236, 230),
+		AttackMotion = "Shoot",
+		Attachments = {
+			Head = head,
+			Torso = torso,
+			LeftArm = { sleeve },
+			RightArm = wand,
+		},
+	}
+end
+
 -- One of Seo Dan's shadow knights: a closed helmet with a glowing visor and
 -- crest, dark plate armor, and a violet-edged blade like Seo Dan's.
 local function shadowKnight(): RigSpec
@@ -1066,6 +1159,7 @@ Module.Looks = {
 	Rin = rin(),
 	Yuki = yuki(),
 	Kenji = kenji(),
+	Mio = mio(),
 	ShadowKnight = shadowKnight(),
 } :: { [string]: RigSpec? }
 

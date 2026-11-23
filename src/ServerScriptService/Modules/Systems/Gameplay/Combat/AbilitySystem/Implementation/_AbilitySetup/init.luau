@@ -8,6 +8,7 @@ const AkaneKit = require("@self/_AkaneKit")
 const BrakkKit = require("@self/_BrakkKit")
 const HaruKit = require("@self/_HaruKit")
 const KenjiKit = require("@self/_KenjiKit")
+const MioKit = require("@self/_MioKit")
 const Recall = require("@self/_Recall")
 const RinKit = require("@self/_RinKit")
 const RyukaKit = require("@self/_RyukaKit")
@@ -27,6 +28,7 @@ const KITS = {
 	RinKit,
 	YukiKit,
 	KenjiKit,
+	MioKit,
 	SummonerSpells,
 	Trinkets,
 	Recall,
