@@ -128,7 +128,9 @@ local function createSoldierBrain(master: Unit): (Unit) -> ()
 			end
 		end
 		local enemy = UnitServerService:FindNearest(soldier.Position, SOLDIER_SIGHT, function(other)
-			return other.Kind ~= "Structure" and UnitServerService:CanAttack(soldier, other)
+			return other.Kind ~= "Structure"
+				and other.Kind ~= "Ward"
+				and UnitServerService:CanAttack(soldier, other)
 		end)
 		if enemy then
 			attack(soldier, enemy)
