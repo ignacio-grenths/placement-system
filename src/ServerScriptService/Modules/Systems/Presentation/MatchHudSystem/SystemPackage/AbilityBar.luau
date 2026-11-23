@@ -204,9 +204,9 @@ local function abilityButton(props: ButtonProps): TextButton
 			Text = function()
 				return ability().Name
 			end,
-			TextSize = function()
-				return metrics().NameTextSize
-			end,
+			-- Long names on small buttons shrink to fit instead of breaking
+			-- mid-word.
+			TextScaled = true,
 			TextWrapped = true,
 			TextColor3 = TEXT_COLOR,
 			TextTransparency = function()

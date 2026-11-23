@@ -1,5 +1,6 @@
 --!strict
 
+const HttpService = game:GetService("HttpService")
 const Players = game:GetService("Players")
 
 const Signal = require("@game/ServerScriptService/Modules/Utilities/Signal")
@@ -14,6 +15,7 @@ const MatchTypes = require("./MatchTypes")
 
 type Participant = MatchTypes.Participant
 type Phase = MatchTypes.Phase
+type ScoreEntry = MatchTypes.ScoreEntry
 type Team = MatchTypes.Team
 
 local Module = {}
@@ -33,6 +35,24 @@ local startTime = 0
 local function setPhase(newPhase: Phase)
 	phase = newPhase
 	MatchNetwork.MatchState:SetAttribute("Phase", newPhase)
+end
+
+-- An attribute replicates to players who join later, which a remote would not.
+local function publishScoreboard()
+	local entries: { ScoreEntry } = {}
+	for _, participant in participants do
+		if participant then
+			table.insert(entries, {
+				UserId = participant.Player.UserId,
+				Name = participant.Player.DisplayName,
+				Team = participant.Team,
+				HeroId = participant.HeroId,
+				Kills = participant.Kills,
+				Deaths = participant.Deaths,
+			})
+		end
+	end
+	MatchNetwork.MatchState:SetAttribute("Scoreboard", HttpService:JSONEncode(entries))
 end
 
 local function countTeam(team: Team): number
@@ -86,8 +106,11 @@ local function onPlayerAdded(player: Player)
 		Player = player,
 		Team = team,
 		HeroId = chooseHero(team),
+		Kills = 0,
+		Deaths = 0,
 	}
 	participants[player] = participant
+	publishScoreboard()
 	Module.ParticipantAdded:Fire(participant)
 
 	if phase == "Waiting" then
@@ -101,6 +124,7 @@ local function onPlayerRemoving(player: Player)
 		return
 	end
 	participants[player] = nil
+	publishScoreboard()
 	Module.ParticipantRemoved:Fire(participant)
 end
 
@@ -124,6 +148,22 @@ function Module:GetElapsed(): number
 	return workspace:GetServerTimeNow() - startTime
 end
 
+--[[
+	Counts a hero death for the victim, and a kill for the killer when a
+	player's hero landed the last hit.
+]]
+function Module:RecordHeroDeath(victim: Player, killer: Player?)
+	local victimEntry = participants[victim]
+	if victimEntry then
+		victimEntry.Deaths += 1
+	end
+	local killerEntry = if killer then participants[killer] else nil
+	if killerEntry and killer ~= victim then
+		killerEntry.Kills += 1
+	end
+	publishScoreboard()
+end
+
 function Module:EndMatch(winner: Team)
 	if phase ~= "Playing" then
 		return
@@ -137,6 +177,7 @@ function Module:Init()
 	MatchNetwork.MatchState:SetAttribute("StartTime", 0)
 	MatchNetwork.MatchState:SetAttribute("Winner", "")
 	setPhase("Waiting")
+	publishScoreboard()
 
 	Players.PlayerAdded:Connect(onPlayerAdded)
 	Players.PlayerRemoving:Connect(onPlayerRemoving)
