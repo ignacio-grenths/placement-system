@@ -8,6 +8,7 @@ const AkaneKit = require("@self/_AkaneKit")
 const BrakkKit = require("@self/_BrakkKit")
 const HaruKit = require("@self/_HaruKit")
 const Recall = require("@self/_Recall")
+const RinKit = require("@self/_RinKit")
 const RyukaKit = require("@self/_RyukaKit")
 const SeoDanKit = require("@self/_SeoDanKit")
 const SummonerSpells = require("@self/_SummonerSpells")
@@ -21,6 +22,7 @@ const KITS = {
 	SeoDanKit,
 	BrakkKit,
 	AkaneKit,
+	RinKit,
 	SummonerSpells,
 	Trinkets,
 	Recall,

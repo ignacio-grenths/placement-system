@@ -92,6 +92,33 @@ local function join(...: { PartPlan }): { PartPlan }
 	return joined
 end
 
+--[[
+	A pointed animal ear from two wedges back to back, standing on base and
+	leaning out to the side by tilt radians. Mirror it for the other ear.
+]]
+local function pointedEar(color: Color3, base: Vector3, size: Vector2, tilt: number): { PartPlan }
+	local frame = CFrame.new(base) * CFrame.Angles(0, 0, tilt)
+	local halfSize = Vector3.new(0.12, size.Y, size.X / 2)
+	return {
+		{
+			Shape = "Wedge",
+			Size = halfSize,
+			Offset = frame
+				* CFrame.new(-size.X / 4, size.Y / 2, 0)
+				* CFrame.Angles(0, math.pi / 2, 0),
+			Color = color,
+		},
+		{
+			Shape = "Wedge",
+			Size = halfSize,
+			Offset = frame
+				* CFrame.new(size.X / 4, size.Y / 2, 0)
+				* CFrame.Angles(0, -math.pi / 2, 0),
+			Color = color,
+		},
+	}
+end
+
 local function hairCap(color: Color3): PartPlan
 	return {
 		Shape = "Ellipsoid",
@@ -707,6 +734,74 @@ local function akane(): RigSpec
 	}
 end
 
+-- The Storm Fox: sky-blue hair with fox ears, a big fox tail with a white
+-- tip, a short blue jacket trimmed in light, and glowing claws on both hands.
+local function rin(): RigSpec
+	local hair = Color3.fromRGB(130, 205, 255)
+	local spark = Color3.fromRGB(120, 230, 255)
+	local jacket = Color3.fromRGB(40, 64, 150)
+	local earTip = Color3.fromRGB(40, 60, 110)
+	local ears = join(
+		pointedEar(hair, Vector3.new(-0.45, 0.78, 0.05), Vector2.new(0.5, 0.62), 0.3),
+		pointedEar(earTip, Vector3.new(-0.45, 0.84, -0.03), Vector2.new(0.28, 0.4), 0.3)
+	)
+	local sideLock =
+		lock(hair, Vector3.new(-0.72, 0.36, -0.08), Vector3.new(-0.74, -0.4, -0.36), 0.32)
+	local head: { PartPlan } = {
+		hairCap(hair),
+		lock(hair, Vector3.new(-0.34, 0.72, -0.36), Vector3.new(-0.5, 0.26, -0.84), 0.36),
+		lock(hair, Vector3.new(0.02, 0.76, -0.4), Vector3.new(0.06, 0.2, -0.86), 0.36),
+		lock(hair, Vector3.new(0.36, 0.72, -0.36), Vector3.new(0.52, 0.26, -0.84), 0.34),
+		lock(hair, Vector3.new(0, 0.5, 0.55), Vector3.new(0, -0.2, 0.95), 0.5),
+	}
+	local torso: { PartPlan } = {
+		belt(Color3.fromRGB(24, 30, 60)),
+		{
+			Shape = "Block",
+			Size = Vector3.new(0.1, 1.5, 0.06),
+			Offset = CFrame.new(-0.2, 0.05, -0.42) * CFrame.Angles(0, 0, -0.35),
+			Color = spark,
+			Material = Enum.Material.Neon,
+		},
+		lock(hair, Vector3.new(0, -0.7, 0.45), Vector3.new(0, -0.35, 1.6), 0.9),
+		lock(hair, Vector3.new(0, -0.45, 1.45), Vector3.new(0, 0.35, 2.15), 0.8),
+		lock(Color3.new(1, 1, 1), Vector3.new(0, 0.2, 2.05), Vector3.new(0, 0.8, 2.4), 0.6),
+	}
+	local claws: { PartPlan } = {
+		{
+			Shape = "Block",
+			Size = Vector3.new(0.6, 0.12, 0.6),
+			Offset = CFrame.new(0, -0.55, 0),
+			Color = spark,
+			Material = Enum.Material.Neon,
+		},
+	}
+	for _, across in { -0.16, 0, 0.16 } do
+		table.insert(claws, {
+			Shape = "Block",
+			Size = Vector3.new(0.06, 0.08, 0.7),
+			Offset = CFrame.new(across, -0.95, -0.45),
+			Color = spark,
+			Material = Enum.Material.Neon,
+		})
+	end
+	return {
+		SkinColor = Color3.fromRGB(252, 226, 206),
+		HairColor = hair,
+		EyeColor = Color3.fromRGB(255, 196, 70),
+		TopColor = jacket,
+		BottomColor = Color3.fromRGB(28, 32, 54),
+		ShoeColor = Color3.fromRGB(22, 24, 40),
+		AttackMotion = "DualSlash",
+		Attachments = {
+			Head = join(head, withMirrors(join(ears, { sideLock }))),
+			Torso = torso,
+			LeftArm = claws,
+			RightArm = claws,
+		},
+	}
+end
+
 -- One of Seo Dan's shadow knights: a closed helmet with a glowing visor and
 -- crest, dark plate armor, and a violet-edged blade like Seo Dan's.
 local function shadowKnight(): RigSpec
@@ -778,6 +873,7 @@ Module.Looks = {
 	SeoDan = seoDan(),
 	Brakk = brakk(),
 	Akane = akane(),
+	Rin = rin(),
 	ShadowKnight = shadowKnight(),
 } :: { [string]: RigSpec? }
 

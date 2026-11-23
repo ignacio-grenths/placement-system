@@ -207,6 +207,34 @@ Module.Heroes = {
 		SummonerSpells = { "Blink", "Warp" },
 		SuggestedBuild = { "SwiftBoots", "GrubHammer", "HullPlating", "EchoBlade" },
 	},
+	-- The fastest attacks and feet among melee heroes, paid for with the
+	-- least health and armor of them.
+	Rin = {
+		DisplayName = "Rin",
+		Title = "the Storm Fox",
+		Role = "Jungle",
+		Resource = "Energy",
+		MaxResource = 200,
+		ResourceRegen = 10,
+		ResourceRegenDelay = 0,
+		ResourceOnHeroHit = 0,
+		Abilities = { Q = "Rin.Q", W = "Rin.W", E = "Rin.E", R = "Rin.R" },
+		Stats = {
+			MaxHealth = 570,
+			Armor = 25,
+			AttackDamage = 58,
+			AttackRange = 2.5,
+			AttackInterval = 1.35,
+			MoveSpeed = 16.5,
+			Radius = 1.3,
+		},
+		Color = Color3.fromRGB(110, 200, 255),
+		SkillOrder = { "Q", "E", "W" },
+		-- Energy is a fixed pool, so it does not grow.
+		Growth = { MaxHealth = 82, Armor = 3, AttackDamage = 3.1, MaxResource = 0 },
+		SummonerSpells = { "Blink", "Hunt" },
+		SuggestedBuild = { "SwiftBoots", "EchoBlade", "GrubHammer", "VoidShard" },
+	},
 } :: { [string]: HeroEntry }
 
 return Module
