@@ -1,0 +1,421 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Anime MOBA Plan</title><script src="kit/kit.js" defer></script>
+<style>
+.mb-fig { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 16px; margin: 16px 0; }
+.mb-fig svg { width: 100%; max-width: 520px; height: auto; display: block; margin: 0 auto; }
+.mb-fig .river { stroke: var(--info-bg); stroke-width: 34; stroke-linecap: round; fill: none; }
+.mb-fig .lane { stroke: var(--soft); stroke-width: 14; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.mb-fig .ground { fill: var(--bg); stroke: var(--line); }
+.mb-fig .base-b { fill: var(--info-bg); stroke: var(--info); }
+.mb-fig .base-r { fill: var(--err-bg); stroke: var(--err); }
+.mb-fig .tw-b { fill: var(--info); }
+.mb-fig .tw-r { fill: var(--err); }
+.mb-fig .gate-b { fill: none; stroke: var(--info); stroke-width: 3; }
+.mb-fig .gate-r { fill: none; stroke: var(--err); stroke-width: 3; }
+.mb-fig .camp { fill: var(--warn); }
+.mb-fig .buff { fill: var(--warn); stroke: var(--ink); stroke-width: 1.5; }
+.mb-fig .boss { fill: var(--accent); stroke: var(--ink); stroke-width: 1.5; }
+.mb-fig .wreck { fill: none; stroke: var(--accent); stroke-dasharray: 4 3; }
+.mb-fig .crater { fill: var(--panel); stroke: var(--muted); stroke-width: 2; }
+.mb-fig .pad { fill: var(--ok); }
+.mb-fig text { fill: var(--ink2); font-family: var(--f-mono); font-size: 10px; }
+.mb-fig .lbl { fill: var(--muted); font-size: 9px; }
+.mb-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: center; margin-top: 10px; font-family: var(--f-mono); font-size: 12px; color: var(--ink2); }
+.mb-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.mb-lobby { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin: 16px 0; background: var(--bg); font-family: var(--f-body); }
+.mb-lobby .top { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--panel); font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.mb-lobby .top b { color: var(--ink); }
+.mb-lobby .top .play { background: var(--accent); color: var(--bg); padding: 6px 14px; border-radius: 6px; font-weight: 700; }
+.mb-lobby .top .lock { opacity: .55; }
+.mb-lobby .body { display: grid; grid-template-columns: 1fr 180px; min-height: 220px; }
+.mb-lobby .main { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.mb-lobby .slots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.mb-lobby .slot { border: 1px dashed var(--line); border-radius: 8px; padding: 10px 4px; text-align: center; font-size: 11px; color: var(--muted); }
+.mb-lobby .slot.me { border: 1px solid var(--accent); color: var(--ink); }
+.mb-lobby .roles { display: flex; flex-wrap: wrap; gap: 6px; font-family: var(--f-mono); font-size: 11px; }
+.mb-lobby .roles span { border: 1px solid var(--line); padding: 4px 8px; border-radius: 999px; color: var(--ink2); }
+.mb-lobby .roles span.on { border-color: var(--accent); color: var(--ink); }
+.mb-lobby .find { align-self: flex-start; background: var(--accent); color: var(--bg); font-weight: 700; padding: 10px 22px; border-radius: 8px; font-family: var(--f-display); }
+.mb-lobby .friends { border-left: 1px solid var(--line); padding: 12px; font-size: 12px; color: var(--ink2); background: var(--panel); }
+.mb-lobby .friends div { padding: 4px 0; }
+.mb-lobby .friends .on::before { content: "● "; color: var(--ok); }
+.mb-lobby .friends .game::before { content: "● "; color: var(--warn); }
+.mb-lobby .friends .off { color: var(--muted); }
+@media (max-width: 560px) { .mb-lobby .body { grid-template-columns: 1fr; } .mb-lobby .friends { border-left: 0; border-top: 1px solid var(--line); } }
+</style>
+
+<rk-header tag="Plan · Anime MOBA · Whole game" title="Crashpoint Valley" sub="A 5v5, three-lane, top-down MOBA on Roblox with five original anime-inspired heroes, alien minion waves, jungle bosses, and a League-style lobby, built in four milestones starting with a playable map against bots."></rk-header>
+<rk-stats>
+5v5 | players per match, bots fill empty slots |
+5 | heroes, one per role | 2 in milestone 1
+~20 min | target match length |
+30 s | between alien waves, first at 1:00 |
+4 | milestones, map first, lobby third |
+</rk-stats>
+
+<h2>What we settled</h2>
+<p>Every answer from the interview, in one place. The page builds on these, so correct anything here first.</p>
+<rk-table>
+Topic | Decision
+Heroes | Original heroes inspired by five anime archetypes, with new names and designs, so the game is safe to publish
+Roster | All five heroes, one per lane role. Picking a role picks your hero until the roster grows, so mirror matches are allowed
+Match fill | 5v5. A short queue, then bots take any empty slot
+Controls | Right-click to move and attack, Q W E R abilities. Touch joystick and buttons on mobile, sticks and buttons on gamepad
+Devices | PC, mobile, and console from the first release
+Win condition | Two towers per lane, then a base gate per lane, then the enemy core. About 20 minutes
+Waves | First wave at 1:00, then one every 30 seconds, the same in Studio and on live servers
+Jungle | 4 small camps and 2 buff camps per side, a river boss, and a late-game boss
+Progression | Levels 1 to 15, gold from last hits and kills, and an item shop at base
+Item pairs | Four pairs of items. Owning both items in a pair unlocks a pair bonus that changes how you play. One pair bonus at a time
+Runes | A page of three small runes picked before a match. Earned by playing, or all unlocked at once with Robux
+Summoner spells | Two per hero, picked before a match, on D and F
+Resources | Each hero runs on one of mana, energy, stamina, or cooldowns only
+Fairness | Every hero has the same power budget and a clear weakness. Bot-vs-bot matches check that no hero wins more than 55%
+Camera | Locked on your hero. On PC a key toggles edge panning, and Space recenters
+Vision | Everything visible in milestone 1. Fog of war and bushes in milestone 2. Wards later
+Servers | One place with two modes: public servers run the lobby, and reserved servers run matches
+Friends | Your Roblox friends in the lobby, parties of up to 5 that queue together
+Ranked | Later, with a hidden skill rating and visible themed tiers
+Leavers | A bot takes over at once, and the player gets their hero back if they rejoin
+Lobby | A full-screen menu client in our own style, not a 3D hub
+Map theme | A valley where an alien mothership crashed
+Art | Placeholder models now. Final models drop in later
+Money | All heroes free. Cosmetics later, plus a Robux bundle that unlocks every rune early. Runes stay small sidegrades, and every one can be earned by playing
+</rk-table>
+
+<h2>The heroes</h2>
+<p>Each hero takes one anime archetype and gets a new name, look, and ability names. The names are working names: rename any of them (see Decisions).</p>
+<rk-table>
+Hero | Archetype | Role | Resource | Q | W | E | R | Ships in
+Haru | Clone ninja, burst assassin | Mid | Energy | Echo Clone: a clone that copies his attacks | Spiral Strike: dash and burst | Leaf Step: swap places with a clone | Echo Storm: clones surround one target | M1
+Ryuka | Energy-blast fighter, ranged carry | Bot | Mana (Ki) | Ki Volley: a line skillshot | Power Surge: attack speed while charged | Flash Step: short dash | Celestial Beam: long-range channeled beam | M1
+Torvik | Viking duelist, fighter | Top | Stamina | Twin Fangs: three-hit dagger combo | Parry: block one hit, then counter | Leap Strike: gap closer | Berserk Flurry: lifesteal flurry | M2
+Seo Dan | Shadow summoner, jungler | Jungle | Mana | Shadow Slash: cleave | Shadow Rise: a fallen monster or alien fights for him | Shadow Swap: trade places with a soldier | Sovereign Legion: every soldier charges | M2
+Brakk | Titan shifter, tank support | Support | Cooldowns only | Stone Fist: knock-up | Bulwark: shield an ally | Titan Leap: engage from range | Colossus Form: grows huge, slows and stuns nearby enemies | M2
+</rk-table>
+
+<h3>Resources</h3>
+<rk-table>
+Resource | Pool | Comes back | Who
+Mana | Grows with level | Slowly, faster with the Crystal Golem buff and potions | Ryuka, Seo Dan
+Energy | Fixed 200 | Fast, 10 per second, always | Haru
+Stamina | Fixed 100 | Only after 2 s without spending, then fast. Hits on heroes give 5 back | Torvik
+Cooldowns only | None | Nothing to manage, but cooldowns are about 20% longer | Brakk
+</rk-table>
+
+<h3>Keeping it fair</h3>
+<p>No hero gets to be the strong one. Every number lives in one hero catalog, and each hero spends the same power budget: base stats sit in one shared band, and extra damage is paid for with a weakness.</p>
+<rk-table>
+Hero | Strong at | Weak at
+Haru | Burst on one target, escaping through clones | Long fights, since energy runs dry. Falls off late
+Ryuka | Safe damage from range, late game | Lowest health. Rooted while the beam channels. Slow mana early
+Torvik | One-on-one duels, sticking to targets | No range. Stamina runs out in long chases
+Seo Dan | Objectives and fights near camps | Weak ganks until his soldiers stack up
+Brakk | Starting fights, protecting allies | Low damage, long cooldowns
+</rk-table>
+<rk-callout kind="ok" title="How fairness gets checked.">From milestone 2, a test mode runs hundreds of bot-vs-bot matches and reports each hero's win rate. A hero outside 45 to 55% gets tuned in the catalog, not in code.</rk-callout>
+<rk-callout kind="risk" title="Keep them original.">New names, new silhouettes, new colors, and no signature lines, outfits, or hairstyles copied from the shows. An archetype such as a clone ninja or a titan shifter is fair to use. An exact character is not, and can get the game taken down when it gets noticed.</rk-callout>
+
+<h2>Map layout</h2>
+<p>Three lanes run between the bases at opposite corners, and the river crosses on the other diagonal. Three things set it apart from League's map: mid lane runs straight through a **crash ring**, a shallow round dip where the river meets mid; each team has two **launch pads** in its jungle that fling you to the river; and each lane has two towers, not three. The mothership wreck sits in the top river pit, where the late boss lives. The map mirrors across the line between the two bases, so both teams get the same layout.</p>
+<div class="mb-fig">
+<svg viewBox="0 0 400 400" role="img" aria-label="Map of Crashpoint Valley: three lanes, a river, two bases, towers, jungle camps, and two bosses">
+  <rect class="ground" x="10" y="10" width="380" height="380" rx="12"/>
+  <line class="river" x1="40" y1="40" x2="360" y2="360"/>
+  <polyline class="lane" points="45,330 45,45 330,45"/>
+  <circle class="crater" cx="200" cy="200" r="24"/>
+  <line class="lane" x1="80" y1="320" x2="320" y2="80"/>
+  <polygon class="pad" points="80,247 88,255 80,263 72,255"/><polygon class="pad" points="135,297 143,305 135,313 127,305"/>
+  <polygon class="pad" points="255,72 263,80 255,88 247,80"/><polygon class="pad" points="305,127 313,135 305,143 297,135"/>
+  <polyline class="lane" points="70,355 355,355 355,70"/>
+  <rect class="base-b" x="14" y="300" width="86" height="86" rx="10"/>
+  <rect class="base-r" x="300" y="14" width="86" height="86" rx="10"/>
+  <circle class="tw-b" cx="45" cy="355" r="9"/><text x="58" y="378">core</text>
+  <circle class="tw-r" cx="355" cy="45" r="9"/><text x="318" y="30">core</text>
+  <rect class="gate-b" x="38" y="291" width="14" height="14"/><rect class="gate-b" x="93" y="291" width="14" height="14"/><rect class="gate-b" x="101" y="348" width="14" height="14"/>
+  <rect class="gate-r" x="291" y="38" width="14" height="14"/><rect class="gate-r" x="293" y="93" width="14" height="14"/><rect class="gate-r" x="348" y="101" width="14" height="14"/>
+  <circle class="tw-b" cx="45" cy="240" r="6"/><circle class="tw-b" cx="45" cy="150" r="6"/>
+  <circle class="tw-b" cx="122" cy="278" r="6"/><circle class="tw-b" cx="150" cy="250" r="6"/>
+  <circle class="tw-b" cx="160" cy="355" r="6"/><circle class="tw-b" cx="250" cy="355" r="6"/>
+  <circle class="tw-r" cx="240" cy="45" r="6"/><circle class="tw-r" cx="150" cy="45" r="6"/>
+  <circle class="tw-r" cx="278" cy="122" r="6"/><circle class="tw-r" cx="250" cy="150" r="6"/>
+  <circle class="tw-r" cx="355" cy="160" r="6"/><circle class="tw-r" cx="355" cy="250" r="6"/>
+  <circle class="buff" cx="100" cy="200" r="7"/><circle class="camp" cx="85" cy="150" r="4"/><circle class="camp" cx="125" cy="235" r="4"/>
+  <circle class="buff" cx="210" cy="300" r="7"/><circle class="camp" cx="165" cy="320" r="4"/><circle class="camp" cx="255" cy="318" r="4"/>
+  <circle class="buff" cx="200" cy="100" r="7"/><circle class="camp" cx="150" cy="85" r="4"/><circle class="camp" cx="235" cy="125" r="4"/>
+  <circle class="buff" cx="300" cy="210" r="7"/><circle class="camp" cx="320" cy="165" r="4"/><circle class="camp" cx="318" cy="255" r="4"/>
+  <circle class="wreck" cx="125" cy="125" r="22"/><circle class="boss" cx="125" cy="125" r="9"/><text x="96" y="160">Hive Queen</text>
+  <circle class="boss" cx="275" cy="275" r="8"/><text x="257" y="300">Skyray</text>
+  <text class="lbl" x="22" y="200" transform="rotate(-90 22 200)">TOP</text>
+  <text class="lbl" x="108" y="300" transform="rotate(-45 108 300)">MID</text>
+  <text class="lbl" x="207" y="234">crash ring</text>
+  <text class="lbl" x="195" y="380">BOT</text>
+  <text class="lbl" x="214" y="216">river</text>
+  <text x="22" y="296">BLUE</text><text x="345" y="112">RED</text>
+</svg>
+<div class="mb-legend"><span><i style="background:var(--info)"></i>blue towers and core</span><span><i style="background:var(--err)"></i>red towers and core</span><span><i style="border:2px solid var(--ink2);border-radius:2px"></i>base gates</span><span><i style="background:var(--warn)"></i>jungle camps (big dot is a buff)</span><span><i style="background:var(--accent)"></i>bosses</span><span><i style="background:var(--ok);border-radius:2px"></i>launch pads</span><span><i style="border:2px solid var(--muted)"></i>crash ring</span></div>
+</div>
+<rk-table>
+Structure or area | Per team | What it does
+Outer tower | 3, one per lane | Shoots the nearest alien, or any enemy hero who attacks an allied hero in range
+Inner tower | 3 | Same, with more health. Can be hit only once the outer tower in that lane falls
+Base gate | 3 | Can be hit only once both towers in that lane fall. While a gate is down, the attackers send a Mega Zib down that lane. It rebuilds after 4 minutes
+Core | 1 | Can be hit once any gate falls. Destroying it wins the match
+Fountain and shop | 1 | Spawn point, fast healing, and the only place to buy items
+Jungle | 2 halves per team | 6 camps per side. Monsters leash back to their camp if pulled too far
+Crash ring | Shared, center of mid | A shallow round dip where the river crosses mid. The lane runs straight through it
+Launch pad | 2 | Step on it to be flung to the river by your jungle. Allies only, 60 s cooldown per hero
+</rk-table>
+
+<h2>Match flow</h2>
+<rk-table>
+Time | What happens
+0:00 | Heroes spawn at the fountain. The shop is open
+1:00 | First alien wave leaves each base. Jungle camps spawn
+Every 0:30 | Another wave. Every third wave brings a Grub Tank
+5:00 | Skyray spawns in the bottom river pit. Respawns 5 minutes after it dies
+14:00 | Hive Queen wakes in the mothership wreck. Respawns 6 minutes after it dies
+~20:00 | A typical match ends when a core falls
+</rk-table>
+
+<h3>Alien minions</h3>
+<p>Small, cute, anime-style aliens. Each team's aliens wear its color. They walk the lane's waypoints, fight what they meet, and give gold and experience to whoever lands the last hit.</p>
+<rk-table>
+Alien | Job | Per wave | Notes
+Zib | Melee front line | 3 | Tough, short reach
+Blip | Ranged caster | 3 | Fragile, fires plasma bolts
+Grub Tank | Siege | 1 every third wave | Long range, extra damage to towers
+Mega Zib | Super minion | 1 per wave in a lane whose enemy gate is down | Very tough. Stops when the gate rebuilds
+</rk-table>
+
+<h3>Jungle monsters</h3>
+<rk-table>
+Camp | Where | Reward | Respawn
+Glorp Swarm, Spitter Pair, Crawler, Rift Toad | 4 small camps per side | Gold and experience | 2 min
+Crystal Golem | Buff camp, one per side | Focus: faster cooldowns and mana regen for 90 s | 5 min
+Ember Beetle | Buff camp, one per side | Burn: attacks slow and burn for 90 s | 5 min
+Skyray | River boss, shared | A small permanent team bonus that stacks with each kill | 5 min
+Hive Queen | Late boss in the wreck, shared | Hive Call: aliens near your heroes hit harder and take less damage for 3 min | 6 min
+</rk-table>
+
+<h3>Getting stronger</h3>
+<ul>
+<li>**Levels 1 to 15.** Experience comes from nearby alien and monster deaths and from takedowns. The curve is tuned so heroes reach 15 around the 18-minute mark. Points go into Q W E (4 ranks each), and R ranks up at 6, 10, and 14.</li>
+<li>**Gold.** Last hits on aliens and monsters, kills and assists, towers, and a small income every second.</li>
+<li>**Items.** Bought only at the fountain, 6 slots. Boots, potions, 4 standalone items, and the 8 pair items below. No recipe trees.</li>
+<li>**Respawns** grow with level, from 6 seconds to about 35 seconds.</li>
+</ul>
+
+<h3>Item pairs</h3>
+<p>Each pair item is good on its own. Owning both items of a pair unlocks its **pair bonus**, which pushes you toward a different way of winning. Only one pair bonus can be active, so choosing a pair is a commitment.</p>
+<rk-table>
+Pair bonus | Item A | Item B | How it changes the game
+Wrecking Crew | Grub Hammer: attack, extra damage to structures | Hull Plating: armor, health | Splitpush. Hitting a tower makes nearby allied aliens deal 50% more damage to it, so one hero can pressure a side lane alone
+Bounty Hunter | Bounty Scope: crit chance, range | Tracker's Cloak: move speed out of combat | Roam and pick. Hero takedowns pay 50% more gold, and enemy heroes under 30% health near you are revealed
+Last Stand | Titan Aegis: health, shields you cast are stronger | Mender's Charm: heal and shield power, cooldowns | Protect a carry. Shielding an ally under 30% health doubles the shield, once every 20 s per ally
+Spellstrike | Ki Conduit: ability power, resource | Echo Blade: attack, attack speed | Weave. After any ability, your next basic attack deals bonus damage and refunds 10% of that ability's cooldown
+</rk-table>
+<p>The four standalone items: **Beetle Carapace** (armor that reflects some basic attack damage), **Void Shard** (ability power that cuts healing on hit), **Swift Boots** (the upgrade to basic boots), and **Starfall Pendant** (magic resist and a one-time shield when dropping low).</p>
+
+<h3>Summoner spells</h3>
+<p>Two per hero, on D and F, chosen before the match. Until the lobby arrives in M3, each hero gets a sensible default pair.</p>
+<rk-table>
+Spell | Effect | Cooldown
+Blink | Teleport a short distance toward the cursor | 300 s
+Mend | Heal yourself and the most injured nearby ally, with a short speed boost | 240 s
+Scorch | Burn an enemy hero over 5 s and cut their healing | 180 s
+Hunt | Heavy damage to an alien or monster. Needed to secure bosses. The jungler always gets it | 90 s, 2 charges
+Warp | After 4 s, teleport to an allied tower or alien | 360 s
+Drain | Slow an enemy hero and cut their damage by 35% for 3 s | 210 s
+Purify | Remove slows, stuns, and roots, and resist them briefly | 210 s
+</rk-table>
+
+<h3>Runes</h3>
+<p>Before a match you pick one rune from each of three rows. Every rune is small, a few percent at most, and most are sidegrades: they change what you are good at, not how strong you are. That keeps Robux purchases from deciding matches.</p>
+<rk-table>
+Row | Runes (two are unlocked from the start)
+Offense | Sharpened (+3% attack) · Focused (+3% ability power) · Hunter's Edge (+5% damage to monsters) · Executioner (+5% damage to heroes under 35% health) · Siege Breaker (+6% damage to structures)
+Defense | Plated (+4 armor) · Warded (+4 magic resist) · Second Wind (heal 2% health after taking hero damage, 10 s cooldown) · Steady (+8% resistance to slows) · Bulwark (+5% shield strength)
+Utility | Swift (+2% move speed) · Haste (+3 ability haste) · Wellspring (+10% resource regen) · Bounty (+1 gold per last hit) · Spell Tuner (-5% summoner spell cooldowns)
+</rk-table>
+<ul>
+<li>**Earned by playing.** Each match gives account experience, win or lose, and every account level unlocks the next rune. All 15 are unlocked after about 25 matches.</li>
+<li>**Or unlocked now.** A one-time Robux developer product unlocks every rune at once. It gives no rune anyone else can't earn.</li>
+<li>Runes need saved player data, so they arrive with the lobby in M3.</li>
+</ul>
+
+<h2>How it runs</h2>
+<p>A match can hold about 100 live units at once: 10 heroes, up to 70 aliens, 26 monsters, and 20 structures. Roblox characters (Humanoids) are too heavy for that, especially on phones, so the plan runs the match as a server-owned simulation.</p>
+<rk-options>
+Server-owned unit simulation [recommended] | the server moves every unit as plain data on a fixed tick and streams compact snapshots, while clients only draw the models
++ About 100 units stay cheap, because there is no Humanoid physics
++ Fog of war is secure: the server leaves hidden enemies out of each team's stream, so exploits can't reveal them
++ Players can't speed-hack or teleport their hero
+- We write movement, pathing around walls, and unit spacing ourselves
+- Ping delays your own hero, so the client moves it ahead and the server corrects it
+Roblox characters and Humanoid NPCs | each hero is a normal player character and minions are Humanoid NPCs
++ Quick to start, with animation and physics built in
+- About 100 Humanoids is heavy on the server and on phones
+- Roblox sends every enemy's position to every client, so fog can be bypassed
+- Each client owns its character's physics, so speed hacks are possible
+</rk-options>
+
+<rk-diagram title="Systems in a match">
+Player [user] -> HeroControlSystem: click, tap, or button
+HeroControlSystem -> Command remote [queue]: move, attack, cast
+Command remote -> UnitSystem [svc]: checked order
+BotSystem -> UnitSystem: bot orders
+MinionWaveSystem -> UnitSystem: spawns aliens
+JungleSystem -> UnitSystem: spawns monsters
+StructureSystem -> UnitSystem: towers and cores
+UnitSystem -> GoldSystem: last hits, kills
+UnitSystem -> MatchSystem: core destroyed
+UnitSystem -> Snapshot stream [cache]: 20 per second
+Snapshot stream -> UnitVisualsSystem: draws and smooths
+</rk-diagram>
+<p>Systems never require each other directly. Each one's Implementation holds the mediators that connect it to the others, following the Module Loader layout in this repo. The heroes' kits live as data and ability handlers in `HeroSystem`'s Implementation, so `UnitSystem` and `AbilitySystem` stay generic.</p>
+
+<rk-sequence title="Right-click to move">
+Player [user] -> HeroControlSystem [client]: right-clicks the ground
+HeroControlSystem -> HeroControlSystem: shows the click marker, starts walking at once
+HeroControlSystem -> Command [remote]: FireServer(move, point)
+Command -> HeroControlServerService [server]: OnServerEvent
+note HeroControlServerService: rate-limits, checks the hero is alive and the point is on the map
+HeroControlServerService -> UnitSystem [server]: SetOrder(hero, move)
+UnitSystem -> UnitSystem: finds a path, steps each tick
+UnitSystem --> UnitVisualsSystem [client]: snapshots for this team
+UnitVisualsSystem -> UnitVisualsSystem: corrects your hero, smooths the rest
+</rk-sequence>
+
+<h2>Where it lives</h2>
+<p>Every system follows the existing `ExampleSystem` layout: a `SystemPackage` for the generic core and an `Implementation` for this game's setup and wiring. The note says which milestone adds each one.</p>
+<rk-tree title="New systems under ServerScriptService.Modules.Systems">
+Systems [Folder] | LOAD_MODULE
+  + Core [Folder]
+    + ServerModeSystem [Folder] | M3, lobby or match mode
+    + TeleportSystem [Folder] | M3, reserved servers and retries
+    + DataSystem [Folder] | M3, player profiles
+  ~ Gameplay [Folder]
+    - ExampleSystem [Folder] | removed once real systems exist
+    + MatchSystem [Folder] | M1, phases, teams, timer, win
+    + Combat [Folder]
+      + UnitSystem [Folder] | M1, unit records, tick, damage, death
+      + AbilitySystem [Folder] | M1, cooldowns, resources, skillshots, dashes, buffs
+      + SummonerSpellSystem [Folder] | M1, D and F spells
+    + HeroSystem [Folder] | M1, hero catalog, spawning, kits
+    + HeroControlSystem [Folder] | M1, input on all devices to orders
+    + MinionWaveSystem [Folder] | M1, alien waves and lane paths
+    + JungleSystem [Folder] | M1, camps, buffs, bosses
+    + StructureSystem [Folder] | M1, towers, gates, cores
+    + BotSystem [Folder] | M1, bot heroes and leaver takeover
+    + VisionSystem [Folder] | M2, fog of war and bushes
+    + MatchmakingSystem [Folder] | M3, role queue and bot fill
+  + Economy [Folder]
+    + GoldSystem [Folder] | M1
+    + ItemShopSystem [Folder] | M1 small shop, M2 full
+  + Progression [Folder]
+    + HeroLevelSystem [Folder] | M1, experience and levels
+    + RuneSystem [Folder] | M3, rune pages, unlocks, Robux bundle
+    + RankedSystem [Folder] | M4
+  + Social [Folder]
+    + PartySystem [Folder] | M3, Roblox friends and parties
+  + Presentation [Folder]
+    + CameraSystem [Folder] | M1, overhead camera
+    + UnitVisualsSystem [Folder] | M1, models, health bars, smoothing
+    + MatchHudSystem [Folder] | M1, ability bar, minimap, shop, scoreboard
+    + LobbySystem [Folder] | M3, title screen and menu client
+</rk-tree>
+<p>The map is built in Studio and saved as a file under `src/Workspace` so it stays in Git. Lane waypoints, camp spots, tower spots, and the fountain are tagged parts in the map, so the systems find them by tag and the map can change without code changes. The UI is built with Vide, which is already installed.</p>
+
+<h2>The lobby</h2>
+<p>Roblox players are already signed in, so there is no login form. The game opens on a title screen, then the menu client.</p>
+<div class="mb-lobby" aria-label="Lobby wireframe">
+  <div class="top"><span class="play">PLAY</span><b>Home</b><span>Profile</span><span>Heroes</span><span>Store</span><span class="lock">Ranked 🔒 (M4)</span></div>
+  <div class="body">
+    <div class="main">
+      <div style="font-family:var(--f-mono);font-size:11px;color:var(--muted)">PARTY · NORMAL 5v5</div>
+      <div class="slots"><div class="slot me">You<br>Mid · Bot</div><div class="slot">Friend<br>Top</div><div class="slot">+ Invite</div><div class="slot">+ Invite</div><div class="slot">+ Invite</div></div>
+      <div class="roles"><span>Top</span><span>Jungle</span><span class="on">1st · Mid</span><span class="on">2nd · Bot</span><span>Support</span></div>
+      <div class="find">Find Match</div>
+    </div>
+    <div class="friends"><div style="font-family:var(--f-mono);font-size:11px;color:var(--muted)">FRIENDS</div><div class="on">Akira</div><div class="game">Mika · in match</div><div class="on">Sora</div><div class="off">Ren · offline</div></div>
+  </div>
+</div>
+<rk-sequence title="Finding a match">
+Party leader [user] -> LobbySystem [client]: Find Match, roles Mid then Bot
+LobbySystem -> QueueRequest [remote]: FireServer(roles)
+QueueRequest -> MatchmakingService [server]: adds the party's ticket
+MatchmakingService -> MemoryStore queue [db]: ticket shared by every lobby server
+note MatchmakingService: builds teams by role, and fills with bots after 60 s
+MatchmakingService -> TeleportService [ext]: ReserveServer, then TeleportAsync with match data
+TeleportService --> MatchServer [server]: players arrive in match mode
+MatchServer -> MatchServer: waits up to 30 s, bots take any no-shows
+</rk-sequence>
+
+<h2>Milestones and work</h2>
+<p>Lobby and matchmaking move to milestone 3, because role select needs all five heroes, and they arrive in milestone 2. Until then, joining the place starts a match against bots directly, which is also how milestones 1 and 2 are tested in Studio.</p>
+<rk-table>
+ID | Item | System | Milestone | Status
+MB-1 | Greybox Crashpoint Valley, drawn on each client from the `MapLayout` data module that every system reads | MapSystem | M1 | [done]
+MB-2 | Unit records, server tick, damage, death, unit spacing. Pathing around jungle walls comes with the walls | UnitSystem | M1 | [progress]
+MB-3 | Snapshot stream at 15 per second, client smoothing, health bars, placeholder models | UnitVisualsSystem | M1 | [done]
+MB-4 | Right-click move and attack, S to stop, tap to move, gamepad stick. QWER and B to recall come with abilities | HeroControlSystem | M1 | [progress]
+MB-5 | Locked overhead camera, Y toggles edge panning on PC, Space to recenter, wheel to zoom | CameraSystem | M1 | [done]
+MB-6 | Cooldowns, mana, skillshots, dashes, shields, and buffs as data plus handlers | AbilitySystem | M1 | [todo]
+MB-7 | Haru and Ryuka with full kits | HeroSystem | M1 | [todo]
+MB-8 | Towers with target priority, gates that rebuild, cores | StructureSystem | M1 | [done]
+MB-9 | Waves at 1:00 then every 30 s, Grub Tank every third, Mega Zib when a gate is down | MinionWaveSystem | M1 | [done]
+MB-10 | 12 camps, 2 buffs per side, Skyray at 5:00, Hive Queen at 14:00, leashing | JungleSystem | M1 | [todo]
+MB-11 | Experience, levels 1 to 15, ability points, respawn timers | HeroLevelSystem | M1 | [todo]
+MB-31 | Resources: mana, energy, stamina, and cooldowns only | AbilitySystem | M1 | [todo]
+MB-32 | Summoner spells on D and F, with default pairs per hero | SummonerSpellSystem | M1 | [todo]
+MB-12 | Last-hit, kill, assist, tower, and passive gold | GoldSystem | M1 | [todo]
+MB-13 | Small shop: boots, potions, 6 items, fountain only | ItemShopSystem | M1 | [todo]
+MB-14 | Bots that lane, last-hit, retreat, fight, and take objectives | BotSystem | M1 | [todo]
+MB-15 | Match phases, teams, win on core. The end screen comes with the HUD | MatchSystem | M1 | [progress]
+MB-16 | Ability bar, health and mana, gold, shop panel, minimap, scoreboard | MatchHudSystem | M1 | [todo]
+MB-17 | Specs for wave timing and makeup, and damage after armor. Gold and level curves follow with MB-11 and MB-12 | Tests | M1 | [done]
+MB-18 | Torvik, Seo Dan with shadow soldiers, Brakk with Colossus Form | HeroSystem | M2 | [todo]
+MB-19 | Team vision, fog drawing, bushes, hidden enemies left out of snapshots | VisionSystem | M2 | [todo]
+MB-20 | Full shop with the four item pairs, pair bonuses, and a suggested build per hero | ItemShopSystem | M2 | [todo]
+MB-33 | Bot-vs-bot balance runs with a win rate per hero | Tooling | M2 | [todo]
+MB-21 | Bots for all five roles, including a jungle route | BotSystem | M2 | [todo]
+MB-22 | Lobby or match mode from reserved-server data | ServerModeSystem | M3 | [todo]
+MB-23 | Title screen and menu client with stories | LobbySystem | M3 | [todo]
+MB-24 | Roblox friends list, invites, parties of up to 5 | PartySystem | M3 | [todo]
+MB-25 | Role queue with two picks, cross-server queue, bot fill after 60 s | MatchmakingSystem | M3 | [todo]
+MB-26 | Reserve a server, teleport the party with match data, retry on failure | TeleportSystem | M3 | [todo]
+MB-27 | Wait for arrivals, bots for no-shows, leaver takeover and rejoin | MatchSystem, BotSystem | M3 | [todo]
+MB-28 | Profiles with settings and match history | DataSystem | M3 | [todo]
+MB-34 | Rune pages, account levels that unlock runes, and spell and rune picks in the lobby | RuneSystem | M3 | [todo]
+MB-35 | Robux developer product that unlocks every rune | RuneSystem | M3 | [todo]
+MB-29 | Ranked queue, hidden rating, themed tiers | RankedSystem | M4 | [todo]
+MB-30 | Cosmetic skins for Robux, nothing that affects winning | ItemShopSystem | M4 | [todo]
+</rk-table>
+
+<h3>Milestone 1 build order</h3>
+<rk-steps>
+Greybox the map | lanes, river, bases, and tagged spots, so everything after has a place to run
+Units and visuals | unit records on the server tick and placeholder models on clients, tested with dummy units first
+Controls and camera | right-click move on PC, then touch and gamepad, with the camera following
+Structures and waves | towers, gates, and cores, then aliens walking the lanes and fighting
+Abilities and two heroes | the ability framework, then Haru and Ryuka on top of it
+Gold, levels, and the small shop | last hits pay out, levels unlock ranks, and the fountain sells items
+Jungle | camps, buffs, then the two bosses
+Bots and the full match | bots fill the other nine slots, and a match runs from 0:00 to a destroyed core
+</rk-steps>
+
+<h2>Risks</h2>
+<rk-callout kind="risk" title="Copyright.">The heroes stay safe only while their names, faces, outfits, and signature moves stay original. Review each hero's final art against its source show before release.</rk-callout>
+<rk-callout kind="warn" title="Runes for Robux.">Selling runes means money can touch gameplay, which the first plan ruled out. It stays fair only while every rune is small, mostly a sidegrade, and earnable in about 25 matches. Ranked (M4) should keep that rule.</rk-callout>
+<rk-callout kind="warn" title="Unit count on phones.">About 100 units with health bars and effects is heavy for low-end phones. Visuals use pooling, and the roblox-performance rules apply from MB-2 onward, with a profile on a real phone at the end of milestone 1.</rk-callout>
+<rk-callout kind="warn" title="Bots carry early matches.">With few players, most slots go to bots, so bot quality decides whether the game is fun at launch. MB-14 gets real time, not a stub.</rk-callout>
+<rk-callout kind="note" title="Movement feel.">The server owns movement, so your own hero would lag by your ping. The client starts moving it at once and eases toward the server's position, the way most MOBAs do.</rk-callout>
+<rk-callout kind="note" title="Mobile screen space.">A MOBA HUD is crowded. The game-ui-design rules for thumb reach and text size guide MB-16 and MB-23.</rk-callout>
+
+<h2>Decisions</h2>
+<p>Approved on 2026-11-22 with the recommended defaults: working hero names, Crashpoint Valley as the working title, a small shop in M1, a 60-second queue before bots fill, and ProfileStore for player data. Still open:</p>
+<rk-decisions>
+Rune bundle price | Recommended: set it when M3 ships, once there is data on how fast players earn runes.
+</rk-decisions>
+
+<footer>Plan for the Crashpoint Valley MOBA, from the interview on 2026-11-22, updated the same day with item pairs, runes, summoner spells, resources, the level 15 cap, and the new map features. Milestone 1 is in progress.</footer>
