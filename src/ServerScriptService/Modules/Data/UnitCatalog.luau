@@ -139,6 +139,26 @@ Module.Units = {
 		},
 		Visual = { Shape = "Ball", Size = Vector3.new(14, 14, 14), Style = "Core" },
 	},
+	-- The Sensor Ward a hero's trinket places. It only watches, and only
+	-- heroes bother to break it.
+	SensorWard = {
+		DisplayName = "Sensor Ward",
+		Stats = {
+			MaxHealth = 150,
+			Armor = 0,
+			AttackDamage = 0,
+			AttackRange = 0,
+			AttackInterval = 1,
+			MoveSpeed = 0,
+			Radius = 1,
+		},
+		Visual = {
+			Shape = "Cylinder",
+			Size = Vector3.new(1.2, 3, 1.2),
+			Style = "Plain",
+			Bob = 0.15,
+		},
+	},
 	-- Jungle monsters. Nil colors would paint them in the neutral yellow, so
 	-- each camp gets its own look. Tuned so a level 1 hero using only basic
 	-- attacks clears a small camp losing about a third of its health, and a

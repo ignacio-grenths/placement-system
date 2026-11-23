@@ -342,6 +342,17 @@ Module.Abilities = {
 		Range = 0,
 		Values = { ImmunityDuration = 1.5 },
 	},
+	-- Every hero's trinket, in the T slot.
+	["Trinket.Ward"] = {
+		Name = "Sensor Ward",
+		Description = "Places a sensor that shows the area around it to your team for 90 seconds. "
+			.. "Holds two at a time.",
+		Cooldown = 75,
+		Cost = 0,
+		Targeting = "Point",
+		Range = 20,
+		Values = { Duration = 90, MaxWards = 2 },
+	},
 	Recall = {
 		Name = "Recall",
 		Description = "After a few seconds standing still, returns to the fountain.",

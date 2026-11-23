@@ -4,8 +4,9 @@ const UnitTypes = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitTypes"
 )
 
--- Q W E R are a hero's abilities, D and F its summoner spells, B its recall.
-export type Slot = "Q" | "W" | "E" | "R" | "D" | "F" | "B"
+-- Q W E R are a hero's abilities, D and F its summoner spells, T its trinket,
+-- and B its recall.
+export type Slot = "Q" | "W" | "E" | "R" | "D" | "F" | "T" | "B"
 export type ResourceKind = "Mana" | "Energy" | "Stamina" | "None"
 -- Direction: fired along a line. Point: lands on a spot within range.
 -- Unit: needs a target that passes TargetFilter. Self: no aim at all.

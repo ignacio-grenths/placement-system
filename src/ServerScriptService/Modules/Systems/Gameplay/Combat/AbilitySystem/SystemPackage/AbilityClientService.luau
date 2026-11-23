@@ -45,6 +45,7 @@ const KEYBOARD_SLOTS: { [Enum.KeyCode]: Slot } = {
 	[Enum.KeyCode.R] = "R",
 	[Enum.KeyCode.D] = "D",
 	[Enum.KeyCode.F] = "F",
+	[Enum.KeyCode.T] = "T",
 	[Enum.KeyCode.B] = "B",
 }
 
@@ -55,6 +56,7 @@ const GAMEPAD_SLOTS: { [Enum.KeyCode]: Slot } = {
 	[Enum.KeyCode.ButtonR2] = "R",
 	[Enum.KeyCode.DPadLeft] = "D",
 	[Enum.KeyCode.DPadRight] = "F",
+	[Enum.KeyCode.DPadUp] = "T",
 	[Enum.KeyCode.DPadDown] = "B",
 }
 

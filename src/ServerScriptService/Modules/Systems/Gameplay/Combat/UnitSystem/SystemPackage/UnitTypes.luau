@@ -2,7 +2,8 @@
 
 export type Team = "Blue" | "Red" | "Neutral"
 -- A summon is a short-lived helper, like a clone, that fights for its owner.
-export type UnitKind = "Hero" | "Minion" | "Monster" | "Structure" | "Summon"
+-- A ward stands still and only gives its team sight.
+export type UnitKind = "Hero" | "Minion" | "Monster" | "Structure" | "Summon" | "Ward"
 -- Attack and Ability damage are reduced by armor; True damage is not.
 export type DamageKind = "Attack" | "Ability" | "True"
 export type StatName =

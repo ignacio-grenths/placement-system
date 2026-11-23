@@ -16,7 +16,7 @@ const CASTS_PER_SECOND = 10
 const CAST_BURST = 15
 -- Unit ids travel as unsigned 16-bit values.
 const MAX_UNIT_ID = 65535
-const SLOTS = { "Q", "W", "E", "R", "D", "F", "B" }
+const SLOTS = { "Q", "W", "E", "R", "D", "F", "T", "B" }
 
 const AbilityTypes = require("./AbilityTypes")
 const UnitTypes = require(

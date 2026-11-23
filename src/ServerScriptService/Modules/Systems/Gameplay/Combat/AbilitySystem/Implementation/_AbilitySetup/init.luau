@@ -11,12 +11,24 @@ const RyukaKit = require("@self/_RyukaKit")
 const SeoDanKit = require("@self/_SeoDanKit")
 const SummonerSpells = require("@self/_SummonerSpells")
 const TorvikKit = require("@self/_TorvikKit")
+const Trinkets = require("@self/_Trinkets")
+
+const KITS = {
+	HaruKit,
+	RyukaKit,
+	TorvikKit,
+	SeoDanKit,
+	BrakkKit,
+	SummonerSpells,
+	Trinkets,
+	Recall,
+}
 
 local Module = {}
 
 function Module:Init()
 	local handlers = {}
-	for _, kit in { HaruKit, RyukaKit, TorvikKit, SeoDanKit, BrakkKit, SummonerSpells, Recall } do
+	for _, kit in KITS do
 		for abilityId, handler in kit do
 			handlers[abilityId] = handler
 		end

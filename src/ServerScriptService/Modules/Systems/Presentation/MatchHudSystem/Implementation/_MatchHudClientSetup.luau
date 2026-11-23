@@ -54,10 +54,19 @@ const ShopPanel = require("../SystemPackage/ShopPanel")
 
 -- Seconds between refreshes. Cooldowns only show tenths below one second.
 const REFRESH_INTERVAL = 0.1
-const SLOT_ORDER = { "Q", "W", "E", "R", "D", "F", "B" }
+const SLOT_ORDER = { "Q", "W", "E", "R", "D", "F", "T", "B" }
 const MAIN_SLOTS = { Q = true, W = true, E = true, R = true }
-const KEYBOARD_LABELS = { Q = "Q", W = "W", E = "E", R = "R", D = "D", F = "F", B = "B" }
-const GAMEPAD_LABELS = { Q = "LB", W = "RB", E = "LT", R = "RT", D = "DL", F = "DR", B = "DD" }
+const KEYBOARD_LABELS = { Q = "Q", W = "W", E = "E", R = "R", D = "D", F = "F", T = "T", B = "B" }
+const GAMEPAD_LABELS = {
+	Q = "LB",
+	W = "RB",
+	E = "LT",
+	R = "RT",
+	D = "DL",
+	F = "DR",
+	T = "DU",
+	B = "DD",
+}
 const EDGE_MARGIN = 20
 const TOUCH_EDGE_MARGIN = 12
 const DESKTOP_MINIMAP_SIZE = 220
