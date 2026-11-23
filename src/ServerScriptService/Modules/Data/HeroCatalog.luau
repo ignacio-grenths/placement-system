@@ -180,6 +180,33 @@ Module.Heroes = {
 		SummonerSpells = { "Blink", "Drain" },
 		SuggestedBuild = { "SwiftBoots", "TitanAegis", "MendersCharm", "StarfallPendant" },
 	},
+	-- The longest melee reach pays for itself with less health and attack
+	-- than Torvik.
+	Akane = {
+		DisplayName = "Akane",
+		Title = "the Crimson Lancer",
+		Role = "Top",
+		Resource = "Mana",
+		MaxResource = 280,
+		ResourceRegen = 4,
+		ResourceRegenDelay = 0,
+		ResourceOnHeroHit = 0,
+		Abilities = { Q = "Akane.Q", W = "Akane.W", E = "Akane.E", R = "Akane.R" },
+		Stats = {
+			MaxHealth = 610,
+			Armor = 28,
+			AttackDamage = 60,
+			AttackRange = 3.5,
+			AttackInterval = 1.55,
+			MoveSpeed = 16,
+			Radius = 1.3,
+		},
+		Color = Color3.fromRGB(235, 60, 70),
+		SkillOrder = { "Q", "W", "E" },
+		Growth = { MaxHealth = 86, Armor = 3.3, AttackDamage = 3.1, MaxResource = 26 },
+		SummonerSpells = { "Blink", "Warp" },
+		SuggestedBuild = { "SwiftBoots", "GrubHammer", "HullPlating", "EchoBlade" },
+	},
 } :: { [string]: HeroEntry }
 
 return Module

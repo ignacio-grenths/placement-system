@@ -2,7 +2,6 @@
 
 const HttpService = game:GetService("HttpService")
 
-const HeroCatalog = require("@game/ServerScriptService/Modules/Data/HeroCatalog")
 const HeroLevelServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Progression/HeroLevelSystem/SystemPackage/HeroLevelServerService"
 )
@@ -36,30 +35,17 @@ const UnitTypes = require(
 )
 
 type DamageKind = UnitTypes.DamageKind
-type Role = MatchTypes.Role
 type Team = MatchTypes.Team
 type Unit = UnitTypes.Unit
 
 local Module = {}
 
-local random = Random.new()
 -- By hero unit id: damage dealt to enemy heroes.
 local heroDamage: { [number]: number } = {}
 local structures: { [string]: number } = { Blue = 0, Red = 0 }
 local bosses: { [string]: number } = { Blue = 0, Red = 0 }
 local matchStartTime = 0
 local isReported = false
-
-local function pickHero(_team: Team, role: Role): string
-	local candidates = {}
-	for heroId, hero in HeroCatalog.Heroes do
-		if hero.Role == role then
-			table.insert(candidates, heroId)
-		end
-	end
-	table.sort(candidates)
-	return candidates[random:NextInteger(1, #candidates)]
-end
 
 local function getOtherTeam(team: string): string
 	return if team == "Blue" then "Red" else "Blue"
@@ -139,7 +125,6 @@ function Module:Init()
 
 	SimClock.setSpeed(math.floor(speed))
 	MatchServerService:SetPlayersSpectate(true)
-	MatchServerService:SetBotHeroPicker(pickHero)
 	MatchServerService.MatchStarted:Connect(onMatchStarted)
 	MatchServerService.MatchEnded:Connect(onMatchEnded)
 	UnitServerService.UnitDamaged:Connect(onUnitDamaged)

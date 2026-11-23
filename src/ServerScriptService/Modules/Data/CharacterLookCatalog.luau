@@ -618,6 +618,95 @@ local function brakk(): RigSpec
 	}
 end
 
+-- The Crimson Lancer: a long crimson braid tied with a gold ribbon, a red
+-- breastplate over white, a gold sash, wide dark trousers, and a long spear.
+local function akane(): RigSpec
+	local hair = Color3.fromRGB(196, 36, 52)
+	local crimson = Color3.fromRGB(178, 34, 46)
+	local gold = Color3.fromRGB(232, 182, 62)
+	local trousers = Color3.fromRGB(40, 40, 62)
+	local sideLock =
+		lock(hair, Vector3.new(-0.72, 0.36, -0.1), Vector3.new(-0.76, -0.55, -0.4), 0.32)
+	local head: { PartPlan } = {
+		hairCap(hair),
+		lock(hair, Vector3.new(-0.3, 0.74, -0.38), Vector3.new(-0.5, 0.24, -0.84), 0.38),
+		lock(hair, Vector3.new(0.1, 0.76, -0.4), Vector3.new(0.18, 0.2, -0.86), 0.36),
+		lock(hair, Vector3.new(0.4, 0.7, -0.34), Vector3.new(0.56, 0.3, -0.8), 0.3),
+		sideLock,
+		mirrored(sideLock),
+		lock(hair, Vector3.new(0, 0.2, 0.62), Vector3.new(0, -0.55, 0.85), 0.44),
+		lock(hair, Vector3.new(0, -0.5, 0.85), Vector3.new(0, -1.25, 0.95), 0.38),
+		lock(hair, Vector3.new(0, -1.2, 0.95), Vector3.new(0, -1.85, 1), 0.3),
+		{
+			Shape = "Ellipsoid",
+			Size = Vector3.new(0.5, 0.26, 0.26),
+			Offset = CFrame.new(0, -1.8, 1),
+			Color = gold,
+		},
+	}
+	local torso: { PartPlan } = {
+		{
+			Shape = "Block",
+			Size = Vector3.new(1.4, 0.95, 0.12),
+			Offset = CFrame.new(0, 0.22, -0.43),
+			Color = crimson,
+			Material = Enum.Material.Metal,
+		},
+		belt(gold),
+		{
+			Shape = "Block",
+			Size = Vector3.new(0.16, 0.5, 0.06),
+			Offset = CFrame.new(0.35, -0.9, -0.44),
+			Color = gold,
+		},
+	}
+	local shoulderGuard: PartPlan = {
+		Shape = "Block",
+		Size = Vector3.new(0.85, 0.45, 0.8),
+		Offset = CFrame.new(0, 0.6, 0) * CFrame.Angles(0, 0, -0.25),
+		Color = crimson,
+		Material = Enum.Material.Metal,
+	}
+	local spear: { PartPlan } = {
+		{
+			Shape = "Block",
+			Size = Vector3.new(0.12, 0.12, 4.2),
+			Offset = CFrame.new(0, -0.9, -1),
+			Color = Color3.fromRGB(92, 56, 36),
+		},
+		lock(STEEL, Vector3.new(0, -0.9, -3.05), Vector3.new(0, -0.9, -3.75), 0.24),
+		{
+			Shape = "Ball",
+			Size = Vector3.one * 0.26,
+			Offset = CFrame.new(0, -0.9, -3.02),
+			Color = crimson,
+		},
+	}
+	local hakama: PartPlan = {
+		Shape = "Block",
+		Size = Vector3.new(0.74, 1.5, 0.76),
+		Offset = CFrame.new(0, 0.2, 0),
+		Color = trousers,
+	}
+	return {
+		SkinColor = Color3.fromRGB(250, 220, 200),
+		HairColor = hair,
+		EyeColor = Color3.fromRGB(255, 186, 60),
+		TopColor = Color3.fromRGB(240, 236, 230),
+		BottomColor = trousers,
+		ShoeColor = Color3.fromRGB(30, 28, 34),
+		AttackMotion = "Punch",
+		Attachments = {
+			Head = head,
+			Torso = torso,
+			LeftArm = { shoulderGuard },
+			RightArm = spear,
+			LeftLeg = { hakama },
+			RightLeg = { hakama },
+		},
+	}
+end
+
 -- One of Seo Dan's shadow knights: a closed helmet with a glowing visor and
 -- crest, dark plate armor, and a violet-edged blade like Seo Dan's.
 local function shadowKnight(): RigSpec
@@ -688,6 +777,7 @@ Module.Looks = {
 	Torvik = torvik(),
 	SeoDan = seoDan(),
 	Brakk = brakk(),
+	Akane = akane(),
 	ShadowKnight = shadowKnight(),
 } :: { [string]: RigSpec? }
 

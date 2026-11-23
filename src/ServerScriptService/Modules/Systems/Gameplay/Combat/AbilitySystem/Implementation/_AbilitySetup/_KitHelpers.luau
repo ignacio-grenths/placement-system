@@ -41,6 +41,32 @@ function Module.damageAround(caster: Unit, center: Vector3, radius: number, dama
 end
 
 --[[
+	Returns every enemy unit (not structures) touching a band of the given
+	width that runs length studs from origin along direction.
+]]
+function Module.findEnemiesAlongLine(
+	caster: Unit,
+	origin: Vector3,
+	direction: Vector3,
+	length: number,
+	width: number
+): { Unit }
+	local found = {}
+	for _, unit in UnitServerService:GetUnits() do
+		if unit.IsRemoved or unit.IsDead or not isAbilityTarget(caster, unit) then
+			continue
+		end
+		local offset = unit.Position - origin
+		local along = offset:Dot(direction)
+		local across = (offset - direction * along).Magnitude
+		if along >= 0 and along <= length and across <= width / 2 + unit.Stats.Radius then
+			table.insert(found, unit)
+		end
+	end
+	return found
+end
+
+--[[
 	Deals ability damage to every enemy unit (not structures) touching a band
 	of the given width that runs length studs from origin along direction.
 ]]
@@ -52,20 +78,8 @@ function Module.damageAlongLine(
 	width: number,
 	damage: number
 )
-	local targets = {}
-	for _, unit in UnitServerService:GetUnits() do
-		if unit.IsRemoved or unit.IsDead or not isAbilityTarget(caster, unit) then
-			continue
-		end
-		local offset = unit.Position - origin
-		local along = offset:Dot(direction)
-		local across = (offset - direction * along).Magnitude
-		if along >= 0 and along <= length and across <= width / 2 + unit.Stats.Radius then
-			table.insert(targets, unit)
-		end
-	end
 	-- Damage after the scan, since a kill removes units from the live list.
-	for _, target in targets do
+	for _, target in Module.findEnemiesAlongLine(caster, origin, direction, length, width) do
 		UnitServerService:ApplyDamage(target, damage, caster, "Ability")
 	end
 end

@@ -4,6 +4,7 @@ const AbilityCatalog = require("@game/ServerScriptService/Modules/Data/AbilityCa
 
 const AbilityServerService = require("../SystemPackage/AbilityServerService")
 
+const AkaneKit = require("@self/_AkaneKit")
 const BrakkKit = require("@self/_BrakkKit")
 const HaruKit = require("@self/_HaruKit")
 const Recall = require("@self/_Recall")
@@ -19,6 +20,7 @@ const KITS = {
 	TorvikKit,
 	SeoDanKit,
 	BrakkKit,
+	AkaneKit,
 	SummonerSpells,
 	Trinkets,
 	Recall,
