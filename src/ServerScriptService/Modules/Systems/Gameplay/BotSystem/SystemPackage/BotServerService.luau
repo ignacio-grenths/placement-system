@@ -68,6 +68,13 @@ export type JungleOptions = {
 	FinisherDamage: number,
 }
 
+-- Where a bot's team wants it: with no Target it gathers at Point, and with
+-- one it fights the Target there alongside the others.
+export type Objective = {
+	Point: Vector3,
+	Target: Unit?,
+}
+
 export type BotOptions = {
 	-- Points from the bot's base to the enemy core along its lane. A
 	-- jungler helps this lane while all its camps are down.
@@ -75,6 +82,9 @@ export type BotOptions = {
 	Fountain: Vector3,
 	FountainRadius: number,
 	Jungle: JungleOptions?,
+	-- Called each think. A team objective, such as a river boss, takes the
+	-- bot out of its lane or jungle until it returns nil.
+	GetObjective: (() -> Objective?)?,
 }
 
 local Module = {}
@@ -229,6 +239,25 @@ local function findWeakestMonster(camp: JungleCamp): Unit?
 	return weakest
 end
 
+--[[
+	Casts the jungler's finisher spell on a big monster once it would take
+	the kill.
+]]
+local function tryFinisher(bot: Unit, jungle: JungleOptions, monster: Unit)
+	-- Annotated because luau-lsp widens string literals read from a table.
+	local finisherSlot: Slot? = jungle.FinisherSlot
+	if
+		finisherSlot
+		and monster.Health <= jungle.FinisherDamage
+		and monster.Stats.MaxHealth >= jungle.FinisherDamage * FINISHER_MIN_HEALTH_RATIO
+	then
+		AbilityServerService:Cast(bot, finisherSlot, {
+			Point = monster.Position,
+			TargetId = monster.Id,
+		})
+	end
+end
+
 local function isCampStarted(camp: JungleCamp): boolean
 	for _, monster in camp.Monsters do
 		if monster.Health < monster.Stats.MaxHealth then
@@ -259,21 +288,37 @@ local function playJungle(bot: Unit, jungle: JungleOptions): JungleAction
 		return "Clear"
 	end
 
-	-- Annotated because luau-lsp widens string literals read from a table.
-	local finisherSlot: Slot? = jungle.FinisherSlot
-	if
-		finisherSlot
-		and monster.Health <= jungle.FinisherDamage
-		and monster.Stats.MaxHealth >= jungle.FinisherDamage * FINISHER_MIN_HEALTH_RATIO
-	then
-		AbilityServerService:Cast(bot, finisherSlot, {
-			Point = monster.Position,
-			TargetId = monster.Id,
-		})
-	end
+	tryFinisher(bot, jungle, monster)
 	tryAbilities(bot, monster)
 	attack(bot, monster)
 	return "Clear"
+end
+
+--[[
+	Plays the team's objective: fights off an enemy hero that comes within
+	reach, and otherwise gathers or fights where the objective says.
+]]
+local function playObjective(bot: Unit, objective: Objective, enemyHero: Unit?, options: BotOptions)
+	if
+		enemyHero
+		and (enemyHero.Position - bot.Position).Magnitude
+			<= getReach(bot, enemyHero) + TRADE_LEEWAY
+	then
+		attack(bot, enemyHero)
+		return
+	end
+
+	local target = objective.Target
+	if not target then
+		moveTo(bot, objective.Point)
+		return
+	end
+	local jungle = options.Jungle
+	if jungle then
+		tryFinisher(bot, jungle, target)
+	end
+	tryAbilities(bot, target)
+	attack(bot, target)
 end
 
 --[[
@@ -356,6 +401,12 @@ function Module:CreateBrain(options: BotOptions): (Unit) -> ()
 		end)
 		if enemyHero then
 			tryAbilities(bot, enemyHero)
+		end
+
+		local objective = if options.GetObjective then options.GetObjective() else nil
+		if objective then
+			playObjective(bot, objective, enemyHero, options)
+			return
 		end
 
 		local target = pickTarget(bot, enemyHero)
