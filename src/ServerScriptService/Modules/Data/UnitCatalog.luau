@@ -133,6 +133,148 @@ Module.Units = {
 		},
 		Visual = { Shape = "Ball", Size = Vector3.new(14, 14, 14) },
 	},
+	-- Jungle monsters. Nil colors would paint them in the neutral yellow, so
+	-- each camp gets its own look. Tuned so a level 1 hero using only basic
+	-- attacks clears a small camp losing about a third of its health, and a
+	-- buff camp with Hunt losing about half.
+	Glorp = {
+		DisplayName = "Glorp",
+		Stats = {
+			MaxHealth = 200,
+			Armor = 0,
+			AttackDamage = 8,
+			AttackRange = 2,
+			AttackInterval = 1.2,
+			MoveSpeed = 12,
+			Radius = 1.2,
+		},
+		Visual = {
+			Shape = "Ball",
+			Size = Vector3.new(2.4, 2.4, 2.4),
+			Color = Color3.fromRGB(120, 210, 90),
+		},
+	},
+	Spitter = {
+		DisplayName = "Spitter",
+		Stats = {
+			MaxHealth = 300,
+			Armor = 5,
+			AttackDamage = 12,
+			AttackRange = 10,
+			AttackInterval = 1.5,
+			MoveSpeed = 12,
+			Radius = 1.2,
+			ProjectileSpeed = 40,
+		},
+		Visual = {
+			Shape = "Ball",
+			Size = Vector3.new(2.2, 2.2, 2.2),
+			Color = Color3.fromRGB(190, 230, 70),
+		},
+	},
+	Crawler = {
+		DisplayName = "Crawler",
+		Stats = {
+			MaxHealth = 900,
+			Armor = 15,
+			AttackDamage = 25,
+			AttackRange = 2.5,
+			AttackInterval = 1.4,
+			MoveSpeed = 12,
+			Radius = 2,
+		},
+		Visual = {
+			Shape = "Block",
+			Size = Vector3.new(4, 2, 4),
+			Color = Color3.fromRGB(140, 100, 70),
+		},
+	},
+	RiftToad = {
+		DisplayName = "Rift Toad",
+		Stats = {
+			MaxHealth = 1100,
+			Armor = 15,
+			AttackDamage = 28,
+			AttackRange = 2.5,
+			AttackInterval = 1.5,
+			MoveSpeed = 12,
+			Radius = 2.2,
+		},
+		Visual = {
+			Shape = "Ball",
+			Size = Vector3.new(4.4, 3.4, 4.4),
+			Color = Color3.fromRGB(90, 160, 150),
+		},
+	},
+	CrystalGolem = {
+		DisplayName = "Crystal Golem",
+		Stats = {
+			MaxHealth = 1200,
+			Armor = 10,
+			AttackDamage = 25,
+			AttackRange = 3,
+			AttackInterval = 1.4,
+			MoveSpeed = 12,
+			Radius = 2.8,
+		},
+		Visual = {
+			Shape = "Block",
+			Size = Vector3.new(5, 6, 5),
+			Color = Color3.fromRGB(110, 180, 255),
+		},
+	},
+	EmberBeetle = {
+		DisplayName = "Ember Beetle",
+		Stats = {
+			MaxHealth = 1200,
+			Armor = 10,
+			AttackDamage = 28,
+			AttackRange = 3,
+			AttackInterval = 1.4,
+			MoveSpeed = 12,
+			Radius = 2.8,
+		},
+		Visual = {
+			Shape = "Ball",
+			Size = Vector3.new(5.6, 4, 5.6),
+			Color = Color3.fromRGB(255, 120, 50),
+		},
+	},
+	Skyray = {
+		DisplayName = "Skyray",
+		Stats = {
+			MaxHealth = 4000,
+			Armor = 40,
+			AttackDamage = 90,
+			AttackRange = 12,
+			AttackInterval = 1.6,
+			MoveSpeed = 10,
+			Radius = 4,
+			ProjectileSpeed = 50,
+		},
+		Visual = {
+			Shape = "Block",
+			Size = Vector3.new(10, 3, 8),
+			Color = Color3.fromRGB(120, 230, 255),
+		},
+	},
+	HiveQueen = {
+		DisplayName = "Hive Queen",
+		Stats = {
+			MaxHealth = 9000,
+			Armor = 60,
+			AttackDamage = 150,
+			AttackRange = 4,
+			AttackInterval = 1.8,
+			MoveSpeed = 8,
+			Radius = 6,
+		},
+		Visual = {
+			Shape = "Ball",
+			Size = Vector3.new(12, 10, 12),
+			Color = Color3.fromRGB(170, 70, 200),
+		},
+	},
 } :: { [string]: UnitEntry }
 
 return Module

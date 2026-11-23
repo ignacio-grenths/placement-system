@@ -27,10 +27,19 @@ export type Base = {
 }
 
 export type CampSpot = {
+	-- Unique among camps. Id repeats on both sides of the map; Key does not.
+	Key: string,
 	Id: string,
 	Kind: CampKind,
 	-- Nil for the shared river bosses.
 	Team: MapTeam?,
+	Position: Vector3,
+}
+
+-- A camp on Blue's side. buildCamps adds Red's mirror of it and the keys.
+type CampPlacement = {
+	Id: string,
+	Kind: CampKind,
 	Position: Vector3,
 }
 
@@ -88,13 +97,13 @@ const BLUE_STRUCTURES: { StructureSpot } = {
 	{ Id = "Core", Team = "Blue", Tier = "Core", Position = BLUE_CORE },
 }
 
-const BLUE_CAMPS: { CampSpot } = {
-	{ Id = "CrystalGolem", Kind = "CrystalGolem", Team = "Blue", Position = at(100, 200) },
-	{ Id = "WestSmallNorth", Kind = "Small", Team = "Blue", Position = at(85, 150) },
-	{ Id = "WestSmallSouth", Kind = "Small", Team = "Blue", Position = at(125, 235) },
-	{ Id = "EmberBeetle", Kind = "EmberBeetle", Team = "Blue", Position = at(210, 300) },
-	{ Id = "SouthSmallWest", Kind = "Small", Team = "Blue", Position = at(165, 320) },
-	{ Id = "SouthSmallEast", Kind = "Small", Team = "Blue", Position = at(255, 318) },
+const BLUE_CAMPS: { CampPlacement } = {
+	{ Id = "CrystalGolem", Kind = "CrystalGolem", Position = at(100, 200) },
+	{ Id = "WestSmallNorth", Kind = "Small", Position = at(85, 150) },
+	{ Id = "WestSmallSouth", Kind = "Small", Position = at(125, 235) },
+	{ Id = "EmberBeetle", Kind = "EmberBeetle", Position = at(210, 300) },
+	{ Id = "SouthSmallWest", Kind = "Small", Position = at(165, 320) },
+	{ Id = "SouthSmallEast", Kind = "Small", Position = at(255, 318) },
 }
 
 const BLUE_LAUNCH_PADS: { LaunchPad } = {
@@ -125,17 +134,30 @@ local function buildStructures(): { StructureSpot }
 end
 
 local function buildCamps(): { CampSpot }
-	local camps = table.clone(BLUE_CAMPS)
-	for _, camp in BLUE_CAMPS do
+	local camps: { CampSpot } = {}
+	for _, placement in BLUE_CAMPS do
 		table.insert(camps, {
-			Id = camp.Id,
-			Kind = camp.Kind,
+			Key = `Blue:{placement.Id}`,
+			Id = placement.Id,
+			Kind = placement.Kind,
+			Team = "Blue",
+			Position = placement.Position,
+		})
+		table.insert(camps, {
+			Key = `Red:{placement.Id}`,
+			Id = placement.Id,
+			Kind = placement.Kind,
 			Team = "Red",
-			Position = mirror(camp.Position),
+			Position = mirror(placement.Position),
 		})
 	end
-	table.insert(camps, { Id = "HiveQueen", Kind = "HiveQueen", Position = at(125, 125) })
-	table.insert(camps, { Id = "Skyray", Kind = "Skyray", Position = at(275, 275) })
+	table.insert(camps, {
+		Key = "HiveQueen",
+		Id = "HiveQueen",
+		Kind = "HiveQueen",
+		Position = at(125, 125),
+	})
+	table.insert(camps, { Key = "Skyray", Id = "Skyray", Kind = "Skyray", Position = at(275, 275) })
 	return camps
 end
 

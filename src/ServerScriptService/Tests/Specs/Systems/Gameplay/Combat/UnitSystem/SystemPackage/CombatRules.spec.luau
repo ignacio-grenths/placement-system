@@ -69,6 +69,16 @@ describe("CombatRules", function()
 		expect(stats.AttackInterval).toBeCloseTo(0.25)
 	end)
 
+	it("counts a stat the unit doesn't list as zero before a bonus adds to it", function()
+		local focus: { StatModifier } = {
+			{ Stat = "AbilityHaste", Add = 20 },
+		}
+
+		local stats = CombatRules.applyModifiers(BASE_STATS, focus)
+
+		expect(stats.AbilityHaste).toBe(20)
+	end)
+
 	it("leaves stats no modifier names at their base values", function()
 		local slow: { StatModifier } = {
 			{ Stat = "MoveSpeed", Multiply = 0.5 },

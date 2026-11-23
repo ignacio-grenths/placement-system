@@ -26,11 +26,16 @@ end
 
 --[[
 	Splits a death's experience evenly among the enemy heroes close enough to
-	see it, so standing in lane is what levels a hero.
+	see it, so standing in lane is what levels a hero. A jungle monster is
+	everyone's enemy, so its experience goes only to the killer's team.
 ]]
-local function onUnitDied(unit: Unit)
+local function onUnitDied(unit: Unit, killer: Unit?)
 	local xp = getXpReward(unit)
 	if xp <= 0 then
+		return
+	end
+	local rewardedTeam = if unit.Team == "Neutral" and killer then killer.Team else nil
+	if unit.Team == "Neutral" and not rewardedTeam then
 		return
 	end
 
@@ -38,7 +43,9 @@ local function onUnitDied(unit: Unit)
 		unit.Position,
 		ProgressionCatalog.XpShareRadius,
 		function(other)
-			return other.Kind == "Hero" and other.Team ~= unit.Team
+			return other.Kind == "Hero"
+				and other.Team ~= unit.Team
+				and (rewardedTeam == nil or other.Team == rewardedTeam)
 		end
 	)
 	for _, hero in heroes do

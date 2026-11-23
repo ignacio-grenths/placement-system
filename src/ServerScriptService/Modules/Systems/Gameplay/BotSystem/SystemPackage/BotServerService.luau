@@ -13,6 +13,9 @@ const BotRoute = require("./BotRoute")
 -- for at the fountain before going back out.
 const RETREAT_HEALTH_SHARE = 0.3
 const RETURN_HEALTH_SHARE = 0.9
+-- Share of max health a jungler needs to start a fresh camp. Below it the
+-- camp would end in a retreat anyway, so it goes home first.
+const JUNGLE_START_HEALTH_SHARE = 0.7
 -- Studs within which a bot notices enemies around it.
 const SIGHT_RANGE = 26
 -- Studs from a lane's center line within which a unit counts as in it.
@@ -32,6 +35,9 @@ const LAST_HIT_ATTACKS = 1.1
 const TRADE_LEEWAY = 4
 -- Studs that count as already at a destination, so orders aren't reissued.
 const ARRIVED_DISTANCE = 1.5
+-- A finisher is kept for monsters with at least this many times its damage
+-- in max health, so it isn't spent on a small camp at full health.
+const FINISHER_MIN_HEALTH_RATIO = 2
 const ABILITY_SLOTS = { "R", "Q", "W", "E" }
 const RECALL_SLOT = "B"
 
@@ -42,15 +48,33 @@ const UnitTypes = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitTypes"
 )
 
+type JungleAction = "Clear" | "Rest" | "NoCamp"
 type Route = BotRoute.Route
 type Slot = AbilityTypes.Slot
 type Unit = UnitTypes.Unit
 
+export type JungleCamp = {
+	Position: Vector3,
+	-- The camp's living monsters, empty while it is down.
+	Monsters: { Unit },
+}
+
+export type JungleOptions = {
+	-- Called each think for the camps the bot clears.
+	GetCamps: () -> { JungleCamp },
+	-- The summoner spell that finishes a monster, such as Hunt, and how
+	-- much true damage it deals. Nil when the hero has none.
+	FinisherSlot: Slot?,
+	FinisherDamage: number,
+}
+
 export type BotOptions = {
-	-- Points from the bot's base to the enemy core along its lane.
+	-- Points from the bot's base to the enemy core along its lane. A
+	-- jungler helps this lane while all its camps are down.
 	Lane: { Vector3 },
 	Fountain: Vector3,
 	FountainRadius: number,
+	Jungle: JungleOptions?,
 }
 
 local Module = {}
@@ -117,10 +141,8 @@ local function attack(bot: Unit, target: Unit)
 	UnitServerService:IssueOrder(bot, { Kind = "Attack", TargetId = target.Id })
 end
 
-local function tryAbilities(bot: Unit, enemyHero: Unit)
-	local gap = (enemyHero.Position - bot.Position).Magnitude
-		- bot.Stats.Radius
-		- enemyHero.Stats.Radius
+local function tryAbilities(bot: Unit, target: Unit)
+	local gap = (target.Position - bot.Position).Magnitude - bot.Stats.Radius - target.Stats.Radius
 	for _, slot in ABILITY_SLOTS do
 		local info = AbilityServerService:GetAbilityInfo(bot, slot :: Slot)
 		if not info then
@@ -134,8 +156,8 @@ local function tryAbilities(bot: Unit, enemyHero: Unit)
 			continue
 		end
 		local didCast = AbilityServerService:Cast(bot, slot :: Slot, {
-			Point = enemyHero.Position,
-			TargetId = enemyHero.Id,
+			Point = target.Position,
+			TargetId = target.Id,
 		})
 		if didCast then
 			return
@@ -181,6 +203,79 @@ local function pickTarget(bot: Unit, enemyHero: Unit?): Unit?
 	end)
 end
 
+local function findNearestCamp(bot: Unit, camps: { JungleCamp }): JungleCamp?
+	local nearest: JungleCamp? = nil
+	local nearestDistance = math.huge
+	for _, camp in camps do
+		local distance = (camp.Position - bot.Position).Magnitude
+		if #camp.Monsters > 0 and distance < nearestDistance then
+			nearest = camp
+			nearestDistance = distance
+		end
+	end
+	return nearest
+end
+
+local function findWeakestMonster(camp: JungleCamp): Unit?
+	local weakest: Unit? = nil
+	for _, monster in camp.Monsters do
+		if monster.IsDead or monster.IsRemoved or not monster.IsTargetable then
+			continue
+		end
+		if not weakest or monster.Health < weakest.Health then
+			weakest = monster
+		end
+	end
+	return weakest
+end
+
+local function isCampStarted(camp: JungleCamp): boolean
+	for _, monster in camp.Monsters do
+		if monster.Health < monster.Stats.MaxHealth then
+			return true
+		end
+	end
+	return false
+end
+
+--[[
+	Clears the nearest camp that is up: walks there, focuses its weakest
+	monster, and finishes it with the finisher spell once that would take the
+	kill. Asks for a rest instead of starting a fresh camp on low health.
+]]
+local function playJungle(bot: Unit, jungle: JungleOptions): JungleAction
+	local camp = findNearestCamp(bot, jungle.GetCamps())
+	if not camp then
+		return "NoCamp"
+	end
+	if not isCampStarted(camp) and getHealthShare(bot) < JUNGLE_START_HEALTH_SHARE then
+		return "Rest"
+	end
+
+	local monster = findWeakestMonster(camp)
+	if not monster then
+		-- The camp is walking home from a leash and can't be hit yet.
+		moveTo(bot, camp.Position)
+		return "Clear"
+	end
+
+	-- Annotated because luau-lsp widens string literals read from a table.
+	local finisherSlot: Slot? = jungle.FinisherSlot
+	if
+		finisherSlot
+		and monster.Health <= jungle.FinisherDamage
+		and monster.Stats.MaxHealth >= jungle.FinisherDamage * FINISHER_MIN_HEALTH_RATIO
+	then
+		AbilityServerService:Cast(bot, finisherSlot, {
+			Point = monster.Position,
+			TargetId = monster.Id,
+		})
+	end
+	tryAbilities(bot, monster)
+	attack(bot, monster)
+	return "Clear"
+end
+
 --[[
 	Returns where a bot waits in its lane: just behind its own wave's front,
 	or at its furthest standing tower when no wave is out, stepping back from
@@ -215,7 +310,9 @@ end
 --[[
 	Returns a brain that plays a hero in one lane: it follows its wave,
 	last-hits, trades with weaker heroes, casts abilities at enemy heroes,
-	stays out of untanked enemy towers, and recalls home when low.
+	stays out of untanked enemy towers, and recalls home when low. With
+	Jungle options it clears camps instead, and helps its lane while every
+	camp is down.
 ]]
 function Module:CreateBrain(options: BotOptions): (Unit) -> ()
 	local route = BotRoute.new(options.Lane)
@@ -264,7 +361,14 @@ function Module:CreateBrain(options: BotOptions): (Unit) -> ()
 		local target = pickTarget(bot, enemyHero)
 		if target then
 			attack(bot, target)
-		else
+			return
+		end
+		local jungle = options.Jungle
+		local jungleAction: JungleAction = if jungle then playJungle(bot, jungle) else "NoCamp"
+		if jungleAction == "Rest" then
+			isRetreating = true
+			moveTo(bot, options.Fountain)
+		elseif jungleAction == "NoCamp" then
 			moveTo(bot, getLaneSpot(bot, route))
 		end
 	end

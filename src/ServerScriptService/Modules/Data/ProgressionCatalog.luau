@@ -42,6 +42,14 @@ Module.UnitRewards = {
 	Blip = { Gold = 14, Xp = 40 },
 	GrubTank = { Gold = 60, Xp = 110 },
 	MegaZib = { Gold = 60, Xp = 110 },
+	Glorp = { Gold = 15, Xp = 30 },
+	Spitter = { Gold = 20, Xp = 45 },
+	Crawler = { Gold = 60, Xp = 110 },
+	RiftToad = { Gold = 70, Xp = 130 },
+	CrystalGolem = { Gold = 100, Xp = 200 },
+	EmberBeetle = { Gold = 100, Xp = 200 },
+	Skyray = { Gold = 150, Xp = 300 },
+	HiveQueen = { Gold = 300, Xp = 500 },
 } :: { [string]: UnitReward? }
 
 -- Ability ranks: Q, W, and E go to 4, R to 3, and R can rank up only at

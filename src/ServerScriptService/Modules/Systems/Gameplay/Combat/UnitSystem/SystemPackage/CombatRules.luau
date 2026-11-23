@@ -52,6 +52,8 @@ function Module.applyModifiers(base: UnitStats, modifiers: { StatModifier }): Un
 		math.max((base.MaxHealth + (adds.MaxHealth or 0)) * (multipliers.MaxHealth or 1), 1)
 	stats.AbilityPower = ((base.AbilityPower or 0) + (adds.AbilityPower or 0))
 		* (multipliers.AbilityPower or 1)
+	stats.AbilityHaste = ((base.AbilityHaste or 0) + (adds.AbilityHaste or 0))
+		* (multipliers.AbilityHaste or 1)
 	return stats
 end
 

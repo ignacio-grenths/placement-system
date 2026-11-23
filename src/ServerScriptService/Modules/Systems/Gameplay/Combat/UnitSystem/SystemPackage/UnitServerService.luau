@@ -21,6 +21,10 @@ const SEPARATION_INTERVAL = 0.05
 const SEPARATION_CELL_SIZE = 10
 const SEPARATION_CELL_OFFSET = 10000
 const PROJECTILE_HIT_DISTANCE = 1
+-- Studs inside its reach a chasing unit stops. Vector3 holds 32-bit floats,
+-- so a unit stopped exactly at its reach can measure a hair outside it
+-- forever and never attack a target that stands still.
+const CHASE_SLACK = 0.1
 const SYNC_COOLDOWN = 5
 -- Unit ids travel as unsigned 16-bit values.
 const MAX_UNIT_ID = 65535
@@ -273,7 +277,7 @@ local function stepOrder(unit: Unit, dt: number, canMove: boolean)
 				-- A tower can't follow a target out of its range.
 				unit.Order = IDLE_ORDER
 			else
-				moveToward(unit, target.Position, reach, speed, dt)
+				moveToward(unit, target.Position, reach - CHASE_SLACK, speed, dt)
 			end
 			return
 		end
@@ -803,10 +807,11 @@ end
 
 --[[
 	Adds or replaces the modifier under key for duration seconds. Reusing a
-	key refreshes it instead of stacking a second copy.
+	key refreshes it instead of stacking a second copy. A dead unit takes
+	only permanent modifiers (duration math.huge), the kind that outlast death.
 ]]
 function Module:AddModifier(unit: Unit, key: string, modifier: StatModifier, duration: number)
-	if unit.IsDead or unit.IsRemoved then
+	if unit.IsRemoved or (unit.IsDead and duration ~= math.huge) then
 		return
 	end
 	unit.Modifiers[key] = {

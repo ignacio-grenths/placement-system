@@ -491,7 +491,7 @@ function Module:Cast(unit: Unit, slot: Slot, aim: Aim?): (boolean, string?)
 		UnitServerService:SetResource(unit, unit.Resource - cost)
 		state.LastSpendTime = now
 	end
-	local cooldown = ability.Info.Cooldown
+	local cooldown = ability.Info.Cooldown * 100 / (100 + (unit.Stats.AbilityHaste or 0))
 	if cooldown > 0 then
 		state.CooldownEnds[slot] = now + cooldown
 		if unit.OwnerPlayer then

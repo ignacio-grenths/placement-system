@@ -2,6 +2,7 @@
 
 const RunService = game:GetService("RunService")
 
+const Signal = require("@game/ServerScriptService/Modules/Utilities/Signal")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -41,6 +42,8 @@ type Lane = {
 }
 
 local Module = {}
+
+Module.MinionSpawned = Signal.new() :: Signal.Signal<Unit>
 
 local minionTypes: { [MinionRole]: MinionType? } = {}
 local lanes: { Lane } = {}
@@ -131,7 +134,7 @@ local function spawnMinion(lane: Lane, role: MinionRole)
 		return
 	end
 
-	UnitServerService:SpawnUnit({
+	local minion = UnitServerService:SpawnUnit({
 		Kind = "Minion",
 		TypeId = minionType.TypeId,
 		Team = lane.Team,
@@ -139,6 +142,7 @@ local function spawnMinion(lane: Lane, role: MinionRole)
 		Position = lane.Route[1],
 		Brain = createBrain(lane.Route),
 	})
+	Module.MinionSpawned:Fire(minion)
 end
 
 local function spawnWave(waveNumber: number)
