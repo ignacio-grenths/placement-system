@@ -17,6 +17,9 @@ Module.XpPerLevel = { 280, 380, 480, 580, 680, 780, 880, 980, 1080, 1180, 1280, 
 
 -- Studs from a death within which enemy heroes share its experience.
 Module.XpShareRadius = 30
+-- Share of the reward each sharing hero past the first adds to the pool.
+-- Balance runs had bot lane's support four levels behind with an even split.
+Module.XpShareBonus = 0.3
 
 -- Seconds dead at level 1, plus this many per level after.
 Module.BaseRespawnSeconds = 6

@@ -5,6 +5,7 @@ const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
 
+const HeroLevelRules = require("../SystemPackage/HeroLevelRules")
 const HeroLevelServerService = require("../SystemPackage/HeroLevelServerService")
 
 const UnitTypes = require(
@@ -25,9 +26,10 @@ local function getXpReward(unit: Unit): number
 end
 
 --[[
-	Splits a death's experience evenly among the enemy heroes close enough to
-	see it, so standing in lane is what levels a hero. A jungle monster is
-	everyone's enemy, so its experience goes only to the killer's team.
+	Splits a death's experience among the enemy heroes close enough to see
+	it, with a bonus for sharing, so standing in lane is what levels a hero.
+	A jungle monster is everyone's enemy, so its experience goes only to the
+	killer's team.
 ]]
 local function onUnitDied(unit: Unit, killer: Unit?)
 	local xp = getXpReward(unit)
@@ -48,8 +50,9 @@ local function onUnitDied(unit: Unit, killer: Unit?)
 				and (rewardedTeam == nil or other.Team == rewardedTeam)
 		end
 	)
+	local share = HeroLevelRules.getXpShare(xp, #heroes, ProgressionCatalog.XpShareBonus)
 	for _, hero in heroes do
-		HeroLevelServerService:GrantXp(hero, xp / #heroes)
+		HeroLevelServerService:GrantXp(hero, share)
 	end
 end
 

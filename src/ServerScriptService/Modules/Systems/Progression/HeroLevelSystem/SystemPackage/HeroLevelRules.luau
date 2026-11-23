@@ -47,6 +47,18 @@ function Module.canRankUp(
 end
 
 --[[
+	Returns the experience each of the heroes sharing a reward gets. Each
+	hero past the first adds bonusPerExtra of the reward to the pool, so a
+	duo lane is not left a level behind the solo lanes.
+]]
+function Module.getXpShare(xp: number, sharers: number, bonusPerExtra: number): number
+	if sharers <= 0 then
+		return 0
+	end
+	return xp * (1 + bonusPerExtra * (sharers - 1)) / sharers
+end
+
+--[[
 	Returns the points a hero has left to spend: one per level, less the
 	ranks already taken.
 ]]

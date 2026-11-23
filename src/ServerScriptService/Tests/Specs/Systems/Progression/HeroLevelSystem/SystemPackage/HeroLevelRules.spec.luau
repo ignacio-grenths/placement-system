@@ -120,6 +120,17 @@ describe("HeroLevelRules", function()
 		expect(slot).toBe(row.Expected)
 	end)
 
+	it.each({
+		{ Case = "a lone hero takes it all", Sharers = 1, Expected = 300 },
+		{ Case = "two heroes each take more than half", Sharers = 2, Expected = 195 },
+		{ Case = "nobody near takes nothing", Sharers = 0, Expected = 0 },
+	})("splits shared experience with a bonus: $Case", function(row)
+		-- 300 experience, and each extra hero adds 30% to the pool.
+		local share = HeroLevelRules.getXpShare(300, row.Sharers, 0.3)
+
+		expect(share).toBeCloseTo(row.Expected, 5)
+	end)
+
 	it("picks nothing when no ability can rank up", function()
 		local slot = HeroLevelRules.chooseAutoRank(
 			{ "Q", "W", "E" },
