@@ -94,9 +94,15 @@ local function story(props: StoryProps)
 		return list
 	end
 
+	local walls = {}
+	for _, wall in MapLayout.Walls do
+		table.insert(walls, { toMapPoint(wall.From), toMapPoint(wall.To) })
+	end
+
 	return Minimap({
 		Lanes = lanes,
 		River = toMapPath(MapLayout.River),
+		Walls = walls,
 		Dots = dots,
 		Size = controls.Layout.Size,
 	})

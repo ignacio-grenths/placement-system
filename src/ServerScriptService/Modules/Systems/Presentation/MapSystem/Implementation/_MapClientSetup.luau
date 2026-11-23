@@ -73,6 +73,10 @@ const WALL_STRIP_WIDTH = 0.6
 const WALL_POST_HEIGHT = 7
 const WALL_POST_WIDTH = 5
 const WALL_POST_SPACING = 60
+-- Jungle walls stay low, so the overhead camera still sees units behind them.
+const JUNGLE_WALL_HEIGHT = 4
+const JUNGLE_WALL_COLOR = Color3.fromRGB(54, 60, 78)
+const JUNGLE_WALL_STRIP_WIDTH = 0.4
 
 -- Draw order, bottom to top. Lanes bridge the river and run on into the
 -- bases, under the bases' borders.
@@ -384,6 +388,41 @@ local function drawLaunchPads()
 	end
 end
 
+--[[
+	Draws each jungle wall as the server shapes it: a block between its two
+	points with round ends, topped by a light strip.
+]]
+local function drawJungleWalls()
+	local metal = { Material = Enum.Material.Metal, CastsShadow = true }
+	local lift = Vector3.new(0, JUNGLE_WALL_HEIGHT / 2, 0)
+	for _, wall in MapLayout.Walls do
+		local length = (wall.To - wall.From).Magnitude
+		local thickness = wall.Radius * 2
+		MapClientService:DrawProp(
+			CFrame.lookAt(wall.From:Lerp(wall.To, 0.5) + lift, wall.To + lift),
+			Vector3.new(thickness, JUNGLE_WALL_HEIGHT, length),
+			JUNGLE_WALL_COLOR,
+			metal
+		)
+		for _, point in { wall.From, wall.To } do
+			MapClientService:DrawProp(
+				CFrame.new(point + lift),
+				Vector3.new(thickness, JUNGLE_WALL_HEIGHT, thickness),
+				JUNGLE_WALL_COLOR,
+				{ Shape = "Cylinder", Material = Enum.Material.Metal, CastsShadow = true }
+			)
+		end
+
+		local stripLift = Vector3.new(0, JUNGLE_WALL_HEIGHT + WALL_STRIP_HEIGHT / 2, 0)
+		MapClientService:DrawProp(
+			CFrame.lookAt(wall.From:Lerp(wall.To, 0.5) + stripLift, wall.To + stripLift),
+			Vector3.new(JUNGLE_WALL_STRIP_WIDTH, WALL_STRIP_HEIGHT, length),
+			WALL_LIGHT_COLOR,
+			NEON
+		)
+	end
+end
+
 local function drawWalls()
 	local half = MapLayout.HalfSize
 	local center = half + WALL_THICKNESS / 2
@@ -512,6 +551,7 @@ function Module:Start()
 	drawBases()
 	drawCamps()
 	drawLaunchPads()
+	drawJungleWalls()
 	drawWalls()
 	drawWreckage()
 end

@@ -88,6 +88,11 @@ export type Unit = {
 	RemoveOnDeath: boolean,
 	OwnerPlayer: Player?,
 	Order: Order,
+	-- Waypoints around walls toward PathGoal, the last one the goal itself.
+	Path: { Vector3 }?,
+	PathGoal: Vector3?,
+	-- os.clock() time the path is found again, since its goal may move.
+	NextPathTime: number,
 	Dash: Dash?,
 	-- os.clock() times that crowd control and its immunity end.
 	StunnedUntil: number,

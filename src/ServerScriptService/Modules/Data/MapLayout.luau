@@ -43,6 +43,14 @@ type CampPlacement = {
 	Position: Vector3,
 }
 
+-- A jungle wall: a thick line on the ground with round ends.
+export type WallSpot = {
+	From: Vector3,
+	To: Vector3,
+	-- Studs from the wall's center line to its face.
+	Radius: number,
+}
+
 export type LaunchPad = {
 	Team: MapTeam,
 	Position: Vector3,
@@ -106,6 +114,25 @@ const BLUE_CAMPS: { CampPlacement } = {
 	{ Id = "SouthSmallEast", Kind = "Small", Position = at(255, 318) },
 }
 
+const WALL_RADIUS = 2
+
+-- Blue's half of the jungle. Walls line the lanes with gaps to enter by,
+-- shield camps from the river, and narrow the routes between camps.
+const BLUE_WALLS: { WallSpot } = {
+	-- West jungle, between top lane, mid lane, and the river.
+	{ From = at(62, 170), To = at(62, 225), Radius = WALL_RADIUS },
+	{ From = at(95, 138), To = at(106, 152), Radius = WALL_RADIUS },
+	{ From = at(112, 222), To = at(128, 206), Radius = WALL_RADIUS },
+	{ From = at(150, 215), To = at(160, 205), Radius = WALL_RADIUS },
+	{ From = at(85, 232), To = at(100, 222), Radius = WALL_RADIUS },
+	-- South jungle, between mid lane, bot lane, and the river.
+	{ From = at(185, 338), To = at(235, 338), Radius = WALL_RADIUS },
+	{ From = at(225, 272), To = at(240, 287), Radius = WALL_RADIUS },
+	{ From = at(180, 300), To = at(190, 288), Radius = WALL_RADIUS },
+	{ From = at(140, 285), To = at(155, 275), Radius = WALL_RADIUS },
+	{ From = at(270, 300), To = at(282, 312), Radius = WALL_RADIUS },
+}
+
 const BLUE_LAUNCH_PADS: { LaunchPad } = {
 	{ Team = "Blue", Position = at(80, 255), Landing = at(150, 150) },
 	{ Team = "Blue", Position = at(135, 305), Landing = at(250, 250) },
@@ -161,6 +188,18 @@ local function buildCamps(): { CampSpot }
 	return camps
 end
 
+local function buildWalls(): { WallSpot }
+	local walls = table.clone(BLUE_WALLS)
+	for _, wall in BLUE_WALLS do
+		table.insert(walls, {
+			From = mirror(wall.From),
+			To = mirror(wall.To),
+			Radius = wall.Radius,
+		})
+	end
+	return walls
+end
+
 local function buildLaunchPads(): { LaunchPad }
 	local pads = table.clone(BLUE_LAUNCH_PADS)
 	for _, pad in BLUE_LAUNCH_PADS do
@@ -185,6 +224,7 @@ Module.LaneNames = LANE_NAMES
 Module.Routes = buildRoutes()
 Module.Structures = buildStructures()
 Module.Camps = buildCamps()
+Module.Walls = buildWalls()
 Module.LaunchPads = buildLaunchPads()
 
 Module.Bases = {

@@ -6,6 +6,7 @@ const RunService = game:GetService("RunService")
 const Signal = require("@game/ServerScriptService/Modules/Utilities/Signal")
 
 const CombatRules = require("./CombatRules")
+const Navigation = require("./Navigation")
 const UnitNetwork = require("./UnitNetwork")
 const UnitSnapshotCodec = require("./UnitSnapshotCodec")
 
@@ -25,6 +26,12 @@ const PROJECTILE_HIT_DISTANCE = 1
 -- so a unit stopped exactly at its reach can measure a hair outside it
 -- forever and never attack a target that stands still.
 const CHASE_SLACK = 0.1
+-- Seconds a path around walls is trusted before it is found again.
+const REPATH_INTERVAL = 0.5
+-- Studs a path's goal may drift, as when chasing, before it is found again.
+const REPATH_DISTANCE = 4
+-- Studs from a waypoint at which a walker moves on to the next.
+const WAYPOINT_REACHED_DISTANCE = 1
 const SYNC_COOLDOWN = 5
 -- Unit ids travel as unsigned 16-bit values.
 const MAX_UNIT_ID = 65535
@@ -108,9 +115,48 @@ local isPaused = false
 local lastUnitId = 0
 local snapshotTimer = 0
 local separationTimer = 0
+local navigation: Navigation.Navigation? = nil
 
 local function flatten(position: Vector3): Vector3
 	return Vector3.new(position.X, 0, position.Z)
+end
+
+local function clearPath(unit: Unit)
+	unit.Path = nil
+	unit.PathGoal = nil
+end
+
+--[[
+	Returns the point a unit walking to goal should head for now: the goal
+	itself when nothing is in the way, else the next waypoint around the
+	walls. The second result is true when that point is the goal.
+]]
+local function getSteerPoint(unit: Unit, goal: Vector3, now: number): (Vector3, boolean)
+	local walls = navigation
+	if not walls or Navigation.isClear(walls, unit.Position, goal) then
+		clearPath(unit)
+		return goal, true
+	end
+
+	local path = unit.Path
+	local pathGoal = unit.PathGoal
+	if
+		not path
+		or not pathGoal
+		or now >= unit.NextPathTime
+		or (goal - pathGoal).Magnitude > REPATH_DISTANCE
+	then
+		path = Navigation.findPath(walls, unit.Position, goal)
+		unit.Path = path
+		unit.PathGoal = goal
+		unit.NextPathTime = now + REPATH_INTERVAL
+	end
+	assert(path, "A path was just found")
+
+	while #path > 1 and (path[1] - unit.Position).Magnitude <= WAYPOINT_REACHED_DISTANCE do
+		table.remove(path, 1)
+	end
+	return path[1], #path == 1
 end
 
 local function allocateUnitId(): number
@@ -257,12 +303,14 @@ local function stepDash(unit: Unit, dt: number)
 	end
 end
 
-local function stepOrder(unit: Unit, dt: number, canMove: boolean)
+local function stepOrder(unit: Unit, dt: number, now: number, canMove: boolean)
 	local order = unit.Order
 	local speed = if canMove then unit.Stats.MoveSpeed else 0
 	if order.Kind == "Move" then
-		if moveToward(unit, order.Target, 0, speed, dt) then
+		local point, isGoal = getSteerPoint(unit, order.Target, now)
+		if moveToward(unit, point, 0, speed, dt) and isGoal then
 			unit.Order = IDLE_ORDER
+			clearPath(unit)
 		end
 	elseif order.Kind == "Attack" then
 		local target = unitsById[order.TargetId]
@@ -277,7 +325,9 @@ local function stepOrder(unit: Unit, dt: number, canMove: boolean)
 				-- A tower can't follow a target out of its range.
 				unit.Order = IDLE_ORDER
 			else
-				moveToward(unit, target.Position, reach - CHASE_SLACK, speed, dt)
+				local point, isGoal = getSteerPoint(unit, target.Position, now)
+				local stopDistance = if isGoal then reach - CHASE_SLACK else 0
+				moveToward(unit, point, stopDistance, speed, dt)
 			end
 			return
 		end
@@ -388,6 +438,13 @@ local function separateUnits()
 			end
 		end
 		unit.Position += push
+
+		-- Walls win over crowding: a unit shoved or dashed into one is put
+		-- back outside it.
+		local walls = navigation
+		if walls then
+			unit.Position = Navigation.pushOut(walls, unit.Position, unit.Stats.Radius)
+		end
 	end
 end
 
@@ -523,7 +580,7 @@ local function stepUnit(unit: Unit, dt: number, now: number)
 		unit.NextThinkTime = now + THINK_INTERVAL
 		runBrain(unit, brain)
 	end
-	stepOrder(unit, dt, now >= unit.RootedUntil)
+	stepOrder(unit, dt, now, now >= unit.RootedUntil)
 end
 
 local function step(frameTime: number)
@@ -616,6 +673,9 @@ function Module:SpawnUnit(options: SpawnOptions): Unit
 		CrowdControlImmuneUntil = 0,
 		HealingCutUntil = 0,
 		AttackCooldown = 0,
+		Path = nil,
+		PathGoal = nil,
+		NextPathTime = 0,
 		Brain = options.Brain,
 		-- Spread first thinks out, so a whole wave doesn't think on one frame.
 		NextThinkTime = os.clock() + random:NextNumber(0, THINK_INTERVAL),
@@ -737,6 +797,7 @@ end
 
 function Module:IssueOrder(unit: Unit, order: Order)
 	unit.Order = order
+	clearPath(unit)
 end
 
 --[[
@@ -896,6 +957,7 @@ function Module:Dash(unit: Unit, destination: Vector3, speed: number, onArrive: 
 		return
 	end
 	unit.Order = IDLE_ORDER
+	clearPath(unit)
 	unit.Dash = {
 		Destination = flatten(destination),
 		Speed = speed,
@@ -914,6 +976,7 @@ function Module:Teleport(unit: Unit, position: Vector3)
 	unit.Position = flatten(position)
 	unit.Dash = nil
 	unit.Order = IDLE_ORDER
+	clearPath(unit)
 	unit.MoveEpoch = (unit.MoveEpoch + 1) % MOVE_EPOCH_COUNT
 end
 
@@ -940,6 +1003,19 @@ end
 ]]
 function Module:SetPaused(paused: boolean)
 	isPaused = paused
+end
+
+--[[
+	Sets the walls units walk around and can't stand in. Paths keep
+	clearance studs from every wall, so it should be at least the largest
+	walking unit's radius. Dashes pass over walls and land outside them.
+]]
+function Module:SetWalls(walls: { Navigation.Wall }, clearance: number)
+	assert(clearance > 0, "The wall clearance must be positive")
+	navigation = if #walls > 0 then Navigation.new(walls, clearance) else nil
+	for _, unit in unitArray do
+		clearPath(unit)
+	end
 end
 
 function Module:Init()

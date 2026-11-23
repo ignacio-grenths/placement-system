@@ -164,6 +164,14 @@ local function getMinimapLanes(): { { Vector2 } }
 	return lanes
 end
 
+local function getMinimapWalls(): { { Vector2 } }
+	local walls = {}
+	for _, wall in MapLayout.Walls do
+		table.insert(walls, { toMapPoint(wall.From), toMapPoint(wall.To) })
+	end
+	return walls
+end
+
 local function buildAbilityViews(): { AbilityView }
 	local loadout = AbilityClientService:GetLoadout()
 	local levelState = HeroLevelClientService:GetState()
@@ -547,6 +555,7 @@ local function minimapGui(): ScreenGui
 	end
 	local lanes = getMinimapLanes()
 	local river = toMapPath(MapLayout.River)
+	local walls = getMinimapWalls()
 
 	return create("ScreenGui")({
 		Name = "MatchMinimap",
@@ -569,6 +578,7 @@ local function minimapGui(): ScreenGui
 			Minimap({
 				Lanes = lanes,
 				River = river,
+				Walls = walls,
 				Dots = minimapDots,
 				Size = function()
 					return if isTouch() then TOUCH_MINIMAP_SIZE else DESKTOP_MINIMAP_SIZE
