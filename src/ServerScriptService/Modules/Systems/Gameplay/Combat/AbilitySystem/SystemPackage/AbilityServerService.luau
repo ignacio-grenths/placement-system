@@ -3,6 +3,7 @@
 const Players = game:GetService("Players")
 const RunService = game:GetService("RunService")
 
+const Signal = require("@game/ServerScriptService/Modules/Utilities/Signal")
 const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
@@ -96,6 +97,8 @@ type CasterState = {
 	-- at rank 0 is not learned yet.
 	Ranks: { [Slot]: number? },
 	CooldownEnds: { [Slot]: number? },
+	-- Seconds each slot's last cooldown ran from its start, for clients.
+	CooldownLengths: { [Slot]: number? },
 	Profile: ResourceProfile,
 	LastSpendTime: number,
 	Channel: Channel?,
@@ -115,6 +118,9 @@ type Bucket = {
 }
 
 local Module = {}
+
+-- (caster, slot, the cooldown it started in seconds) after every cast.
+Module.AbilityCast = Signal.new() :: Signal.Signal<Unit, Slot, number>
 
 local abilities: { [string]: RegisteredAbility? } = {}
 local casters: { [Unit]: CasterState? } = {}
@@ -379,6 +385,7 @@ function Module:SetupCaster(unit: Unit, loadout: { [Slot]: string? }, profile: R
 		Loadout = table.clone(loadout),
 		Ranks = {},
 		CooldownEnds = {},
+		CooldownLengths = {},
 		Profile = profile,
 		LastSpendTime = 0,
 		Channel = nil,
@@ -494,6 +501,7 @@ function Module:Cast(unit: Unit, slot: Slot, aim: Aim?): (boolean, string?)
 	local cooldown = ability.Info.Cooldown * 100 / (100 + (unit.Stats.AbilityHaste or 0))
 	if cooldown > 0 then
 		state.CooldownEnds[slot] = now + cooldown
+		state.CooldownLengths[slot] = cooldown
 		if unit.OwnerPlayer then
 			AbilityNetwork.CooldownStarted:FireClient(
 				unit.OwnerPlayer,
@@ -503,7 +511,31 @@ function Module:Cast(unit: Unit, slot: Slot, aim: Aim?): (boolean, string?)
 			)
 		end
 	end
+	Module.AbilityCast:Fire(unit, slot, cooldown)
 	return true, nil
+end
+
+--[[
+	Takes seconds off the cooldown a slot is on, if any, and tells the
+	caster's player.
+]]
+function Module:ReduceCooldown(unit: Unit, slot: Slot, seconds: number)
+	local state = casters[unit]
+	local endsAt = if state then state.CooldownEnds[slot] else nil
+	if not state or not endsAt then
+		return
+	end
+	local now = os.clock()
+	local reduced = math.max(endsAt - seconds, now)
+	state.CooldownEnds[slot] = reduced
+	if unit.OwnerPlayer then
+		AbilityNetwork.CooldownStarted:FireClient(
+			unit.OwnerPlayer,
+			slot,
+			state.CooldownLengths[slot] or seconds,
+			toServerTime(reduced)
+		)
+	end
 end
 
 --[[

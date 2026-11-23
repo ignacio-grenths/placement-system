@@ -2,6 +2,8 @@
 
 -- Seconds. Attack speed buffs can't push attacks past this rate.
 const MIN_ATTACK_INTERVAL = 0.25
+-- How much a critical attack deals, as a multiple of a normal one.
+const CRIT_MULTIPLIER = 1.75
 
 const UnitTypes = require("./UnitTypes")
 
@@ -54,7 +56,24 @@ function Module.applyModifiers(base: UnitStats, modifiers: { StatModifier }): Un
 		* (multipliers.AbilityPower or 1)
 	stats.AbilityHaste = ((base.AbilityHaste or 0) + (adds.AbilityHaste or 0))
 		* (multipliers.AbilityHaste or 1)
+	stats.AttackRange =
+		math.max((base.AttackRange + (adds.AttackRange or 0)) * (multipliers.AttackRange or 1), 0)
+	stats.CritChance = math.clamp(
+		((base.CritChance or 0) + (adds.CritChance or 0)) * (multipliers.CritChance or 1),
+		0,
+		1
+	)
+	stats.ShieldPower = ((base.ShieldPower or 0) + (adds.ShieldPower or 0))
+		* (multipliers.ShieldPower or 1)
 	return stats
+end
+
+--[[
+	Returns a basic attack's damage: a critical hit when roll, a number from
+	0 to 1, falls under the attacker's crit chance.
+]]
+function Module.rollAttackDamage(damage: number, critChance: number?, roll: number): number
+	return if roll < (critChance or 0) then damage * CRIT_MULTIPLIER else damage
 end
 
 --[[

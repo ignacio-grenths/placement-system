@@ -27,7 +27,21 @@ function Module:Init()
 			Stats = entry.Stats,
 			HealAmount = entry.HealAmount,
 			HealDuration = entry.HealDuration,
+			UpgradeOf = entry.UpgradeOf,
 		})
+	end
+
+	-- Registered in Order, which settles which bonus wins when a hero
+	-- completes two pairs with one purchase.
+	local pairIds = {}
+	for pairId in ItemCatalog.PairBonuses do
+		table.insert(pairIds, pairId)
+	end
+	table.sort(pairIds, function(first, second)
+		return ItemCatalog.PairBonuses[first].Order < ItemCatalog.PairBonuses[second].Order
+	end)
+	for _, pairId in pairIds do
+		ItemShopServerService:RegisterPair(pairId, ItemCatalog.PairBonuses[pairId].Items)
 	end
 end
 

@@ -118,6 +118,7 @@ local lastUnitId = 0
 local snapshotTimer = 0
 local separationTimer = 0
 local navigation: Navigation.Navigation? = nil
+local shieldModifier: ((Unit, number, Unit?) -> number)? = nil
 
 local function flatten(position: Vector3): Vector3
 	return Vector3.new(position.X, 0, position.Z)
@@ -279,6 +280,11 @@ local function performAttack(unit: Unit, target: Unit)
 	unit.AttackCooldown = unit.Stats.AttackInterval
 	UnitNetwork.AttackFired:FireAllClients(unit.Id, target.Id)
 
+	local damage = CombatRules.rollAttackDamage(
+		unit.Stats.AttackDamage,
+		unit.Stats.CritChance,
+		random:NextNumber()
+	)
 	local projectileSpeed = unit.Stats.ProjectileSpeed
 	if projectileSpeed then
 		table.insert(projectiles, {
@@ -286,10 +292,10 @@ local function performAttack(unit: Unit, target: Unit)
 			TargetId = target.Id,
 			Position = unit.Position,
 			Speed = projectileSpeed,
-			Damage = unit.Stats.AttackDamage,
+			Damage = damage,
 		})
 	else
-		Module:ApplyDamage(target, unit.Stats.AttackDamage, unit, "Attack")
+		Module:ApplyDamage(target, damage, unit, "Attack")
 	end
 end
 
@@ -973,14 +979,32 @@ end
 
 --[[
 	Adds a shield that absorbs damage for duration seconds. Shields from
-	several sources add up and last as long as the longest one.
+	several sources add up and last as long as the longest one. The caster's
+	shield power makes the shields it casts stronger.
 ]]
-function Module:AddShield(unit: Unit, amount: number, duration: number)
+function Module:AddShield(unit: Unit, amount: number, duration: number, caster: Unit?)
 	if unit.IsDead or unit.IsRemoved then
 		return
 	end
-	unit.Shield += amount
+	local strength = amount
+	if caster then
+		strength *= 1 + (caster.Stats.ShieldPower or 0) / 100
+	end
+	local modify = shieldModifier
+	if modify then
+		strength = modify(unit, strength, caster)
+	end
+	unit.Shield += strength
 	unit.ShieldExpiresAt = math.max(unit.ShieldExpiresAt, os.clock() + duration)
+end
+
+--[[
+	Sets a game rule that changes each shield as it is cast: it gets the
+	shielded unit, the shield's strength, and the caster, and returns the
+	strength to use.
+]]
+function Module:SetShieldModifier(modify: (Unit, number, Unit?) -> number)
+	shieldModifier = modify
 end
 
 --[[

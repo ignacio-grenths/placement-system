@@ -79,6 +79,19 @@ describe("CombatRules", function()
 		expect(stats.AbilityHaste).toBe(20)
 	end)
 
+	it.each({
+		{
+			Case = "a roll under the crit chance hits 1.75 times as hard",
+			Roll = 0.1,
+			Expected = 175,
+		},
+		{ Case = "a roll at the crit chance hits normally", Roll = 0.25, Expected = 100 },
+	})("rolls critical attacks: $Case", function(row)
+		local damage = CombatRules.rollAttackDamage(100, 0.25, row.Roll)
+
+		expect(damage).toBeCloseTo(row.Expected)
+	end)
+
 	it("leaves stats no modifier names at their base values", function()
 		local slow: { StatModifier } = {
 			{ Stat = "MoveSpeed", Multiply = 0.5 },

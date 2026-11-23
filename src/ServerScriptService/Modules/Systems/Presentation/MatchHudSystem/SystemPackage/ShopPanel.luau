@@ -17,20 +17,38 @@ const BUY_BUTTON_SIZE = Vector2.new(120, 48)
 const HEADER_HEIGHT = 48
 const SCROLL_BAR_THICKNESS = 6
 const GOLD_COLOR = Color3.fromRGB(255, 205, 80)
+const PAIR_COLOR = Color3.fromRGB(110, 200, 255)
 const BUY_COLOR = Color3.fromRGB(60, 140, 90)
 const DISABLED_COLOR = Color3.fromRGB(48, 50, 60)
+const TAG_WIDTH = 190
+const PAIR_LINE_HEIGHT = 40
 
 export type ShopItemView = {
 	Id: string,
 	Name: string,
 	Description: string,
 	Cost: number,
-	-- True for an item the hero can hold only one of and already holds.
-	IsOwned: boolean,
+	-- Why the item can't be bought whatever the gold, such as "Owned" or
+	-- "Needs Boots". Nil when nothing stands in the way.
+	Blocked: string?,
+	-- True for an upgrade, which replaces its base item instead of taking a
+	-- free slot.
+	IsUpgrade: boolean,
+	-- The name of the pair the item belongs to, if any.
+	PairName: string?,
+	-- True when the item is in the local hero's suggested build.
+	IsSuggested: boolean,
+}
+
+export type ActivePairView = {
+	Name: string,
+	Description: string,
 }
 
 export type ShopPanelProps = {
 	Items: () -> { ShopItemView },
+	-- The pair bonus the hero has earned, or nil.
+	ActivePair: () -> ActivePairView?,
 	Gold: () -> number,
 	-- Whether the hero stands where buying works (its fountain, or dead).
 	CanBuyHere: () -> boolean,
@@ -47,11 +65,12 @@ export type ShopPanelProps = {
 	otherwise the reason it can't, so a disabled button always says why.
 ]]
 local function getBuyLabel(item: ShopItemView, props: ShopPanelProps): (string, boolean)
-	if item.IsOwned then
-		return "Owned", false
+	local blocked = item.Blocked
+	if blocked then
+		return blocked, false
 	elseif not props.CanBuyHere() then
 		return "At base", false
-	elseif props.IsInventoryFull() then
+	elseif props.IsInventoryFull() and not item.IsUpgrade then
 		return "Bag full", false
 	elseif props.Gold() < item.Cost then
 		return `Need {item.Cost - math.floor(props.Gold())}`, false
@@ -76,7 +95,7 @@ local function itemRow(item: () -> ShopItemView, layoutOrder: number, props: Sho
 			Name = "ItemName",
 			BackgroundTransparency = 1,
 			Position = UDim2.fromOffset(0, 8),
-			Size = UDim2.new(1, -BUY_BUTTON_SIZE.X - GAP, 0, 22),
+			Size = UDim2.new(1, -BUY_BUTTON_SIZE.X - TAG_WIDTH - GAP * 2, 0, 22),
 			Font = HudTheme.Font,
 			Text = function()
 				return item().Name
@@ -84,6 +103,32 @@ local function itemRow(item: () -> ShopItemView, layoutOrder: number, props: Sho
 			TextSize = HudTheme.BodyTextSize,
 			TextColor3 = HudTheme.TextColor,
 			TextXAlignment = Enum.TextXAlignment.Left,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+		}),
+		create("TextLabel")({
+			Name = "Tags",
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -BUY_BUTTON_SIZE.X - GAP, 0, 8),
+			Size = UDim2.fromOffset(TAG_WIDTH, 22),
+			Font = HudTheme.Font,
+			RichText = true,
+			Text = function()
+				local view = item()
+				local tags = {}
+				if view.IsSuggested then
+					table.insert(tags, `<font color="#{GOLD_COLOR:ToHex()}">Suggested</font>`)
+				end
+				local pairName = view.PairName
+				if pairName then
+					table.insert(tags, `<font color="#{PAIR_COLOR:ToHex()}">{pairName}</font>`)
+				end
+				return table.concat(tags, "  ")
+			end,
+			TextSize = HudTheme.SmallTextSize,
+			TextColor3 = HudTheme.MutedTextColor,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			TextTruncate = Enum.TextTruncate.AtEnd,
 		}),
 		create("TextLabel")({
 			Name = "Description",
@@ -219,9 +264,32 @@ local function shopPanel(props: ShopPanelProps)
 				TextXAlignment = Enum.TextXAlignment.Left,
 			}),
 
+			-- The pair bonus line keeps its place either way, so players learn
+			-- that pairs exist before they earn one.
+			create("TextLabel")({
+				Name = "PairBonus",
+				LayoutOrder = 3,
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 0, PAIR_LINE_HEIGHT),
+				Font = HudTheme.BodyFont,
+				Text = function()
+					local active = props.ActivePair()
+					return if active
+						then `Pair bonus: {active.Name}. {active.Description}`
+						else "Pair bonus: hold both items of a pair to earn its bonus."
+				end,
+				TextSize = HudTheme.SmallTextSize,
+				TextColor3 = function()
+					return if props.ActivePair() then PAIR_COLOR else HudTheme.MutedTextColor
+				end,
+				TextWrapped = true,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Top,
+			}),
+
 			create("ScrollingFrame")({
 				Name = "Items",
-				LayoutOrder = 3,
+				LayoutOrder = 4,
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Size = function()

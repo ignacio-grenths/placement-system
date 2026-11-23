@@ -13,6 +13,9 @@ export type StatName =
 	| "MaxHealth"
 	| "AbilityPower"
 	| "AbilityHaste"
+	| "AttackRange"
+	| "CritChance"
+	| "ShieldPower"
 
 export type UnitStats = {
 	MaxHealth: number,
@@ -31,6 +34,10 @@ export type UnitStats = {
 	AbilityPower: number?,
 	-- Shortens cooldowns: 20 haste makes them 100 / 120 as long. Nil is 0.
 	AbilityHaste: number?,
+	-- Chance from 0 to 1 that a basic attack is critical. Nil is 0.
+	CritChance: number?,
+	-- Percent added to the shields the unit casts. Nil is 0.
+	ShieldPower: number?,
 }
 
 -- Changes one stat: Add applies to the base value first, then Multiply.

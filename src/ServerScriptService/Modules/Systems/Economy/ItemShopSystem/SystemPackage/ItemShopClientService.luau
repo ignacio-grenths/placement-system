@@ -22,9 +22,20 @@ Module.InventoryChanged = Signal.new() :: Signal.Signal<>
 
 -- One item id per slot, "" for an empty slot.
 local inventory: { string } = {}
+local activePair: string? = nil
 
-local function onInventoryChanged(newInventory: { string })
-	inventory = newInventory
+local function onInventoryChanged(newInventory: unknown, newActivePair: unknown)
+	if typeof(newInventory) ~= "table" then
+		return
+	end
+	local slots: { string } = {}
+	for _, itemId in newInventory :: { unknown } do
+		table.insert(slots, if typeof(itemId) == "string" then itemId else "")
+	end
+	inventory = slots
+	activePair = if typeof(newActivePair) == "string" and newActivePair ~= ""
+		then newActivePair
+		else nil
 	Module.InventoryChanged:Fire()
 end
 
@@ -44,6 +55,13 @@ end
 ]]
 function Module:GetInventory(): { string }
 	return inventory
+end
+
+--[[
+	Returns the id of the local player's active pair bonus, or nil.
+]]
+function Module:GetActivePair(): string?
+	return activePair
 end
 
 function Module:RequestBuy(itemId: string)

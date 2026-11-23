@@ -9,6 +9,7 @@ const UnitServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitServerService"
 )
 
+const ItemRules = require("./ItemRules")
 const ItemShopNetwork = require("./ItemShopNetwork")
 
 -- Shop requests a client may send per second.
@@ -32,13 +33,17 @@ export type ItemDefinition = {
 	Stats: { StatModifier },
 	HealAmount: number?,
 	HealDuration: number?,
+	-- The item this one replaces when bought, which must be held.
+	UpgradeOf: string?,
 }
 
 local Module = {}
 
 local items: { [string]: ItemDefinition? } = {}
+local itemPairs: { ItemRules.Pair } = {}
 local inventorySize = 6
 local inventories: { [Player]: { string }? } = {}
+local activePairs: { [Player]: string? } = {}
 local purchaseCheck: ((Player, Unit) -> boolean)? = nil
 local lastRequestTimes: { [Player]: number? } = {}
 
@@ -53,7 +58,16 @@ local function getInventory(player: Player): { string }
 end
 
 local function publish(player: Player)
-	ItemShopNetwork.InventoryChanged:FireClient(player, table.clone(getInventory(player)))
+	ItemShopNetwork.InventoryChanged:FireClient(
+		player,
+		table.clone(getInventory(player)),
+		activePairs[player] or ""
+	)
+end
+
+local function updateActivePair(player: Player)
+	activePairs[player] =
+		ItemRules.getActivePair(getInventory(player), itemPairs, activePairs[player])
 end
 
 local function getModifierKey(slot: number, index: number): string
@@ -121,11 +135,37 @@ end
 
 local function onPlayerRemoving(player: Player)
 	inventories[player] = nil
+	activePairs[player] = nil
 	lastRequestTimes[player] = nil
 end
 
 function Module:RegisterItem(itemId: string, definition: ItemDefinition)
 	items[itemId] = definition
+end
+
+--[[
+	Adds a pair: holding all of its items earns its bonus. When a hero
+	completes two pairs at once, the one registered first wins.
+]]
+function Module:RegisterPair(pairId: string, itemIds: { string })
+	table.insert(itemPairs, {
+		Id = pairId,
+		Items = table.clone(itemIds),
+	})
+end
+
+--[[
+	Returns the player's items, one id per slot and "" for an empty slot.
+]]
+function Module:GetInventory(player: Player): { string }
+	return table.clone(getInventory(player))
+end
+
+--[[
+	Returns the id of the player's active pair bonus, or nil.
+]]
+function Module:GetActivePair(player: Player): string?
+	return activePairs[player]
 end
 
 function Module:SetInventorySize(size: number)
@@ -141,8 +181,31 @@ function Module:SetPurchaseCheck(check: (Player, Unit) -> boolean)
 end
 
 --[[
-	Buys an item into the first empty slot. Returns false and a reason when
-	the purchase can't happen, in which case no gold is spent.
+	Returns the slot a purchase goes into: the item it upgrades, or the first
+	empty slot. Returns nil and a reason when there is none.
+]]
+local function findSlotFor(inventory: { string }, item: ItemDefinition): (number?, string?)
+	local upgradeOf = item.UpgradeOf
+	if upgradeOf then
+		local slot = table.find(inventory, upgradeOf)
+		return slot, if slot then nil else "NeedsBaseItem"
+	end
+	if item.Kind == "Boots" then
+		for _, heldId in inventory do
+			local held = items[heldId]
+			if held and held.Kind == "Boots" then
+				return nil, "AlreadyOwned"
+			end
+		end
+	end
+	local slot = table.find(inventory, EMPTY_SLOT)
+	return slot, if slot then nil else "InventoryFull"
+end
+
+--[[
+	Buys an item into the first empty slot, or over the item it upgrades.
+	Returns false and a reason when the purchase can't happen, in which case
+	no gold is spent.
 ]]
 function Module:Buy(player: Player, itemId: string): (boolean, string?)
 	local item = items[itemId]
@@ -155,24 +218,21 @@ function Module:Buy(player: Player, itemId: string): (boolean, string?)
 	end
 
 	local inventory = getInventory(player)
-	if item.Kind == "Boots" then
-		for _, heldId in inventory do
-			local held = items[heldId]
-			if held and held.Kind == "Boots" then
-				return false, "AlreadyOwned"
-			end
-		end
-	end
-	local slot = table.find(inventory, EMPTY_SLOT)
+	local slot, reason = findSlotFor(inventory, item)
 	if not slot then
-		return false, "InventoryFull"
+		return false, reason
 	end
 	if not GoldServerService:TrySpend(player, item.Cost) then
 		return false, "NotEnoughGold"
 	end
 
+	local replaced = items[inventory[slot]]
+	if replaced then
+		removeItemStats(hero, slot, replaced)
+	end
 	inventory[slot] = itemId
 	applyItemStats(hero, slot, item)
+	updateActivePair(player)
 	publish(player)
 	return true, nil
 end
@@ -194,6 +254,7 @@ function Module:Use(player: Player, slot: number): boolean
 	if item.HealAmount and item.HealDuration then
 		healOverTime(hero, item.HealAmount, item.HealDuration)
 	end
+	updateActivePair(player)
 	publish(player)
 	return true
 end

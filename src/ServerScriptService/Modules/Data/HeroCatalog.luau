@@ -40,6 +40,9 @@ export type HeroEntry = {
 	-- Placeholder body color until the hero's model exists.
 	Color: Color3,
 	SummonerSpells: { SummonerSpell },
+	-- ItemCatalog ids the shop marks as suggested for this hero, built
+	-- around the pair that suits the role.
+	SuggestedBuild: { string },
 }
 
 local Module = {}
@@ -73,6 +76,7 @@ Module.Heroes = {
 		-- Energy is a fixed pool, so it does not grow.
 		Growth = { MaxHealth = 82, Armor = 3, AttackDamage = 3.2, MaxResource = 0 },
 		SummonerSpells = { "Blink", "Scorch" },
+		SuggestedBuild = { "SwiftBoots", "KiConduit", "EchoBlade", "VoidShard" },
 	},
 	Ryuka = {
 		DisplayName = "Ryuka",
@@ -98,6 +102,7 @@ Module.Heroes = {
 		SkillOrder = { "Q", "W", "E" },
 		Growth = { MaxHealth = 76, Armor = 3, AttackDamage = 3, MaxResource = 30 },
 		SummonerSpells = { "Blink", "Mend" },
+		SuggestedBuild = { "SwiftBoots", "BountyScope", "TrackersCloak", "EchoBlade" },
 	},
 	Torvik = {
 		DisplayName = "Torvik",
@@ -123,6 +128,7 @@ Module.Heroes = {
 		-- Stamina is a fixed pool, so it does not grow.
 		Growth = { MaxHealth = 90, Armor = 3.5, AttackDamage = 3.3, MaxResource = 0 },
 		SummonerSpells = { "Blink", "Warp" },
+		SuggestedBuild = { "SwiftBoots", "GrubHammer", "HullPlating", "BeetleCarapace" },
 	},
 	SeoDan = {
 		DisplayName = "Seo Dan",
@@ -147,6 +153,7 @@ Module.Heroes = {
 		SkillOrder = { "Q", "W", "E" },
 		Growth = { MaxHealth = 85, Armor = 3.2, AttackDamage = 3, MaxResource = 28 },
 		SummonerSpells = { "Blink", "Hunt" },
+		SuggestedBuild = { "SwiftBoots", "VoidShard", "KiConduit", "StarfallPendant" },
 	},
 	Brakk = {
 		DisplayName = "Brakk",
@@ -171,6 +178,7 @@ Module.Heroes = {
 		SkillOrder = { "W", "Q", "E" },
 		Growth = { MaxHealth = 95, Armor = 4, AttackDamage = 2.5, MaxResource = 0 },
 		SummonerSpells = { "Blink", "Drain" },
+		SuggestedBuild = { "SwiftBoots", "TitanAegis", "MendersCharm", "StarfallPendant" },
 	},
 } :: { [string]: HeroEntry }
 

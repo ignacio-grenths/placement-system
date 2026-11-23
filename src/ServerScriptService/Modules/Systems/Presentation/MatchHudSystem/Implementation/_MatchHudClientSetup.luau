@@ -116,6 +116,7 @@ type HeroState = {
 
 type ItemSlotView = ItemBar.ItemSlotView
 type ShopItemView = ShopPanel.ShopItemView
+type ActivePairView = ShopPanel.ActivePairView
 
 -- Vide checks for impure effects and yields in Studio, at a small cost.
 Vide.strict = RunService:IsStudio()
@@ -139,6 +140,7 @@ local heroState = source({
 local gold = source(0)
 local itemSlots = source({} :: { ItemSlotView })
 local shopItems = source({} :: { ShopItemView })
+local activePair = source(nil :: ActivePairView?)
 local isInventoryFull = source(false)
 local canBuyHere = source(false)
 local isAutoRanking = source(false)
@@ -368,20 +370,48 @@ local function refreshItems()
 	itemSlots(slots)
 	isInventoryFull(table.find(inventory, "") == nil and #inventory >= ItemCatalog.InventorySize)
 
+	local hero = UnitClientService:GetLocalHero()
+	local heroEntry = if hero then HeroCatalog.Heroes[hero.TypeId] else nil
+	local suggested: { string } = if heroEntry then heroEntry.SuggestedBuild else {}
 	local shop: { ShopItemView } = {}
 	for itemId, entry in ItemCatalog.Items do
+		local upgradeOf = entry.UpgradeOf
+		local holdsThis = table.find(inventory, itemId) ~= nil
+		-- A hero holds one pair of boots: plain boots are owned once any are
+		-- held, and an upgrade is owned once it is held.
+		local isOwnedBoots = entry.Kind == "Boots" and (holdsThis or (not upgradeOf and ownsBoots))
+		local blocked: string? = nil
+		if isOwnedBoots then
+			blocked = "Owned"
+		elseif upgradeOf and not table.find(inventory, upgradeOf) then
+			local base = ItemCatalog.Items[upgradeOf]
+			blocked = `Needs {if base then base.Name else upgradeOf}`
+		end
+		local pairId = entry.Pair
+		local pair = if pairId then ItemCatalog.PairBonuses[pairId] else nil
 		table.insert(shop, {
 			Id = itemId,
 			Name = entry.Name,
 			Description = entry.Description,
 			Cost = entry.Cost,
-			IsOwned = entry.Kind == "Boots" and ownsBoots,
+			Blocked = blocked,
+			IsUpgrade = upgradeOf ~= nil,
+			PairName = if pair then pair.Name else nil,
+			IsSuggested = table.find(suggested, itemId) ~= nil,
 		})
 	end
 	table.sort(shop, function(first, second)
 		return ItemCatalog.Items[first.Id].Order < ItemCatalog.Items[second.Id].Order
 	end)
 	shopItems(shop)
+
+	local activePairId = ItemShopClientService:GetActivePair()
+	local activeEntry = if activePairId then ItemCatalog.PairBonuses[activePairId] else nil
+	activePair(
+		if activeEntry
+			then { Name = activeEntry.Name, Description = activeEntry.Description }
+			else nil
+	)
 
 	gold(GoldClientService:GetGold())
 	canBuyHere(isLocalHeroAtFountain())
@@ -625,6 +655,7 @@ local function hud(): ScreenGui
 
 		ShopPanel({
 			Items = shopItems,
+			ActivePair = activePair,
 			Gold = gold,
 			CanBuyHere = canBuyHere,
 			IsInventoryFull = isInventoryFull,

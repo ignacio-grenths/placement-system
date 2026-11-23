@@ -69,7 +69,7 @@ end
 local function bulwark(context: CastContext): boolean
 	local brakk = context.Caster
 	local values = context.Values
-	UnitServerService:AddShield(brakk, values.Shield, values.ShieldSeconds)
+	UnitServerService:AddShield(brakk, values.Shield, values.ShieldSeconds, brakk)
 	ring(brakk.Position, SMALL_RING_RADIUS)
 
 	local allies = UnitServerService:FindInRadius(brakk.Position, values.AllyRange, function(other)
@@ -85,7 +85,7 @@ local function bulwark(context: CastContext): boolean
 		end
 	end
 	if weakest then
-		UnitServerService:AddShield(weakest, values.Shield, values.ShieldSeconds)
+		UnitServerService:AddShield(weakest, values.Shield, values.ShieldSeconds, brakk)
 		ring(weakest.Position, SMALL_RING_RADIUS)
 	end
 	return true
