@@ -12,12 +12,20 @@ type Participant = MatchTypes.Participant
 
 local Module = {}
 
+-- Bots get their heroes from the bot system; this spawns players' heroes.
 local function onParticipantAdded(participant: Participant)
-	HeroServerService:SpawnHero(participant.Player, participant.HeroId, participant.Team)
+	local player = participant.Player
+	if player then
+		local hero = HeroServerService:SpawnHero(player, participant.HeroId, participant.Team)
+		MatchServerService:AttachHero(participant, hero.Id)
+	end
 end
 
 local function onParticipantRemoved(participant: Participant)
-	HeroServerService:RemoveHero(participant.Player)
+	local player = participant.Player
+	if player then
+		HeroServerService:RemoveHero(player)
+	end
 end
 
 function Module:Init()

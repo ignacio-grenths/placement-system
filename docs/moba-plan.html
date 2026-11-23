@@ -308,7 +308,7 @@ Systems [Folder] | LOAD_MODULE
     + StructureSystem [Folder] | M1, towers, gates, cores
     + BotSystem [Folder] | M1, bot heroes and leaver takeover
     + VisionSystem [Folder] | M2, fog of war and bushes
-    + MatchmakingSystem [Folder] | M3, role queue and bot fill
+    + MatchmakingSystem [Folder] | M3, role queue and cross-server queue
   + Economy [Folder]
     + GoldSystem [Folder] | M1
     + ItemShopSystem [Folder] | M1 small shop, M2 full
@@ -370,7 +370,7 @@ MB-31 | Resources: mana, energy, stamina, and cooldowns only | AbilitySystem | M
 MB-32 | All seven summoner spells on D and F, with default pairs per hero. They run as abilities, so no separate system | AbilitySystem | M1 | [done]
 MB-12 | Last-hit, hero kill, team tower, and passive gold. Assists come with assist tracking | GoldSystem | M1 | [done]
 MB-13 | Small shop: boots, potions, 6 items. Browse anywhere with P, Y, or Shop; buy at the fountain or while dead | ItemShopSystem | M1 | [done]
-MB-14 | Bots that lane, last-hit, retreat, fight, and take objectives | BotSystem | M1 | [todo]
+MB-14 | Bots fill every open role slot. They follow their wave, last-hit, trade with weaker heroes, cast abilities at heroes, stay out of untanked towers, recall when low, and rank abilities automatically. Jungle routes and objectives come with the jungle | BotSystem | M1 | [progress]
 MB-15 | Match phases, teams, win on core, kills and deaths per player, victory and defeat screen | MatchSystem | M1 | [done]
 MB-16 | Ability bar with ranks, hero health, resource, level and XP, match clock with team kills, minimap, scoreboard, gold, item slots, and shop panel, each with a UI Labs story | MatchHudSystem | M1 | [done]
 MB-17 | Specs for wave timing and makeup, and damage after armor. Gold and level curves follow with MB-11 and MB-12 | Tests | M1 | [done]

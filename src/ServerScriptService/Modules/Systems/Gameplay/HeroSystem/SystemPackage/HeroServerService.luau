@@ -40,6 +40,7 @@ local respawnDelayProvider: ((Unit) -> number)? = nil
 local definitions: { [string]: HeroDefinition? } = {}
 local fountains: { [Team]: Fountain? } = {}
 local heroes: { [Player]: Unit? } = {}
+local botHeroes: { Unit } = {}
 
 --[[
 	An idle hero attacks the nearest enemy already in reach, so a player
@@ -82,8 +83,15 @@ local function onUnitDied(unit: Unit)
 end
 
 local function restoreAtFountains()
+	local allHeroes: { Unit } = table.clone(botHeroes)
 	for _, hero in heroes do
-		if not hero or hero.IsDead then
+		if hero then
+			table.insert(allHeroes, hero)
+		end
+	end
+
+	for _, hero in allHeroes do
+		if hero.IsDead then
 			continue
 		end
 		local fountain = fountains[hero.Team]
@@ -163,6 +171,40 @@ end
 
 function Module:GetHero(player: Player): Unit?
 	return heroes[player]
+end
+
+--[[
+	Spawns a hero no player owns, steered by the given brain instead of the
+	auto-attacking one players' heroes get. Errors for an unknown hero id.
+]]
+function Module:SpawnBotHero(heroId: string, team: Team, brain: (Unit) -> ()): Unit
+	local definition = definitions[heroId]
+	if not definition then
+		error(`No hero is registered as {heroId}`)
+	end
+
+	local hero = UnitServerService:SpawnUnit({
+		Kind = "Hero",
+		TypeId = heroId,
+		Team = team,
+		Stats = definition.Stats,
+		Position = getSpawnPoint(team),
+		Brain = brain,
+		MaxResource = definition.MaxResource,
+		RemoveOnDeath = false,
+	})
+	table.insert(botHeroes, hero)
+	Module.HeroSpawned:Fire(hero, heroId)
+	return hero
+end
+
+function Module:RemoveBotHero(hero: Unit)
+	local index = table.find(botHeroes, hero)
+	if index then
+		table.remove(botHeroes, index)
+		UnitServerService:RemoveUnit(hero)
+		Module.HeroRemoved:Fire(hero)
+	end
 end
 
 function Module:Init()

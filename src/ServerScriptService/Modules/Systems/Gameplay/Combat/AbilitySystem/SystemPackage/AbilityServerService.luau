@@ -404,6 +404,17 @@ function Module:RemoveCaster(unit: Unit)
 end
 
 --[[
+	Returns what the ability in a unit's slot is, or nil for an empty slot.
+	Bots read it to know how to aim.
+]]
+function Module:GetAbilityInfo(unit: Unit, slot: Slot): AbilityInfo?
+	local state = casters[unit]
+	local abilityId = if state then state.Loadout[slot] else nil
+	local ability = if abilityId then abilities[abilityId] else nil
+	return if ability then ability.Info else nil
+end
+
+--[[
 	Sets the rank a slot's ability casts at. Rank 0 means not learned, and the
 	slot refuses to cast.
 ]]

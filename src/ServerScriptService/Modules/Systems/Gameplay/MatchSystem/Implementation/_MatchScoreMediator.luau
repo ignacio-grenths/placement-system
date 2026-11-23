@@ -15,13 +15,12 @@ type Unit = UnitTypes.Unit
 local Module = {}
 
 local function onUnitDied(unit: Unit, killer: Unit?)
-	local victim = unit.OwnerPlayer
-	if unit.Kind ~= "Hero" or not victim then
+	if unit.Kind ~= "Hero" then
 		return
 	end
 	-- Deaths to towers and aliens count as deaths but give no one a kill.
-	local killerPlayer = if killer and killer.Kind == "Hero" then killer.OwnerPlayer else nil
-	MatchServerService:RecordHeroDeath(victim, killerPlayer)
+	local killerHeroId = if killer and killer.Kind == "Hero" then killer.Id else nil
+	MatchServerService:RecordHeroDeath(unit.Id, killerHeroId)
 end
 
 function Module:Init()
