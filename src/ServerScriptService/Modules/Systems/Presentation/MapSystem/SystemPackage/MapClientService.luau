@@ -1,6 +1,5 @@
 --!strict
 
-const GROUND_THICKNESS = 2
 -- Flat shapes are this thick (studs). Each layer's top sits LAYER_HEIGHT
 -- above the one below, so overlapping shapes never flicker.
 const FLAT_THICKNESS = 0.2
@@ -8,6 +7,8 @@ const LAYER_HEIGHT = 0.04
 -- Longest straight piece, in studs, a drawn ring is built from.
 const RING_SEGMENT_LENGTH = 5
 const MIN_RING_SEGMENTS = 12
+-- Terrain is stored in cells of this many studs.
+const VOXEL_SIZE = 4
 
 export type PropShape = "Block" | "Wedge" | "Cylinder" | "Ball"
 
@@ -67,14 +68,33 @@ local function getLayerCenterY(layer: number): number
 end
 
 --[[
-	Draws the ground as a square whose top surface is at height zero.
+	Lays flat terrain over the square, its surface at height zero, and asks
+	pickMaterial for the material of each 4-stud column by its center.
+	Neighboring materials blend into each other at their edges.
 ]]
-function Module:DrawGround(halfSize: number, color: Color3, options: SurfaceOptions?)
-	local ground = createPart(color, options)
-	ground.Name = "Ground"
-	ground.Size = Vector3.new(halfSize * 2, GROUND_THICKNESS, halfSize * 2)
-	ground.CFrame = CFrame.new(0, -GROUND_THICKNESS / 2, 0)
-	ground.Parent = getFolder()
+function Module:PaintGround(halfSize: number, pickMaterial: (x: number, z: number) -> Enum.Material)
+	local cellsPerSide = math.ceil(halfSize / VOXEL_SIZE) * 2
+	local corner = cellsPerSide / 2 * VOXEL_SIZE
+	local region =
+		Region3.new(Vector3.new(-corner, -VOXEL_SIZE * 2, -corner), Vector3.new(corner, 0, corner))
+	-- WriteVoxels takes arrays indexed by x, then y, then z.
+	local materials = table.create(cellsPerSide)
+	local occupancies = table.create(cellsPerSide)
+	for xIndex = 1, cellsPerSide do
+		local x = -corner + (xIndex - 0.5) * VOXEL_SIZE
+		local materialRow = table.create(cellsPerSide)
+		for zIndex = 1, cellsPerSide do
+			materialRow[zIndex] = pickMaterial(x, -corner + (zIndex - 0.5) * VOXEL_SIZE)
+		end
+		materials[xIndex] = { materialRow, materialRow }
+		-- Terrain draws a cell's surface half a cell above where its fill
+		-- ends, so a full cell under a half-full one puts it at zero.
+		occupancies[xIndex] = {
+			table.create(cellsPerSide, 1),
+			table.create(cellsPerSide, 0.5),
+		}
+	end
+	workspace.Terrain:WriteVoxels(region, VOXEL_SIZE, materials, occupancies)
 end
 
 function Module:DrawDisc(
