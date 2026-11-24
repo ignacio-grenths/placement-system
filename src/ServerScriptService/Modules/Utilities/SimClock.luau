@@ -4,6 +4,13 @@ const RunService = game:GetService("RunService")
 
 const Signal = require("./Signal")
 
+-- Seconds each step covers above speed 1, whatever the frame rate, so a
+-- sped-up match plays out the same on any machine.
+const FIXED_STEP = 1 / 30
+-- Seconds of steps one frame may run. Roblox kills a thread that runs too
+-- long, which would stop a step halfway and leave units broken.
+const STEP_BUDGET = 0.05
+
 type Timer = {
 	DueAt: number,
 	Callback: (...any) -> (),
@@ -18,14 +25,18 @@ local Module = {}
 -- speed 1 that is once per frame.
 Module.Stepped = Signal.new() :: Signal.Signal<number>
 
--- Seconds the simulation has run ahead of real time.
-local offset = 0
 local speed = 1
+-- Above speed 1, the simulation's own time, which moves only in steps.
+local simulationTime = 0
+-- Server time minus os.clock(), fixed when the speed goes above 1.
+local serverClockOffset = 0
+-- Simulation seconds owed but not yet stepped.
+local owedTime = 0
 local timers: { Timer } = {}
 local connection: RBXScriptConnection? = nil
 
 local function runDueTimers()
-	local now = os.clock() + offset
+	local now = Module.now()
 	local index = 1
 	while index <= #timers do
 		local timer = timers[index]
@@ -41,12 +52,24 @@ local function runDueTimers()
 end
 
 local function onHeartbeat(frameTime: number)
-	for step = 1, speed do
-		if step > 1 then
-			offset += frameTime
-		end
+	if speed == 1 then
 		runDueTimers()
 		Module.Stepped:Fire(frameTime)
+		return
+	end
+
+	owedTime += frameTime * speed
+	const frameStart = os.clock()
+	while owedTime >= FIXED_STEP do
+		if os.clock() - frameStart > STEP_BUDGET then
+			-- Catching up later would only make longer frames.
+			owedTime = 0
+			break
+		end
+		owedTime -= FIXED_STEP
+		simulationTime += FIXED_STEP
+		runDueTimers()
+		Module.Stepped:Fire(FIXED_STEP)
 	end
 end
 
@@ -63,7 +86,7 @@ end
 	way os.clock() does. At speed 1 it equals os.clock().
 ]]
 function Module.now(): number
-	return os.clock() + offset
+	return if speed == 1 then os.clock() else simulationTime
 end
 
 --[[
@@ -71,16 +94,21 @@ end
 	times sent to them. At speed 1 it equals workspace:GetServerTimeNow().
 ]]
 function Module.serverTime(): number
-	return workspace:GetServerTimeNow() + offset
+	return if speed == 1 then workspace:GetServerTimeNow() else simulationTime + serverClockOffset
 end
 
 --[[
-	Runs the simulation this many steps per frame. Above 1, matches play out
-	faster than real time, for balance runs with nobody watching.
+	Runs the simulation this many times as fast as real time, for balance
+	runs with nobody watching. Above 1 it steps in fixed slices and slows
+	down when the machine can't keep up.
 ]]
-function Module.setSpeed(stepsPerFrame: number)
-	assert(stepsPerFrame >= 1 and stepsPerFrame % 1 == 0, "Speed must be a whole number from 1")
-	speed = stepsPerFrame
+function Module.setSpeed(multiplier: number)
+	assert(multiplier >= 1 and multiplier % 1 == 0, "Speed must be a whole number from 1")
+	if speed == 1 and multiplier > 1 then
+		simulationTime = os.clock()
+		serverClockOffset = workspace:GetServerTimeNow() - os.clock()
+	end
+	speed = multiplier
 	ensureRunning()
 end
 

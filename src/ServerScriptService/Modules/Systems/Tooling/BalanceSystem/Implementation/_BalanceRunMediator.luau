@@ -20,8 +20,8 @@ const UnitServerService = require(
 
 const BalanceReport = require("../SystemPackage/BalanceReport")
 
--- A balance run starts when the place has this Workspace attribute: the
--- simulation steps per frame, so 8 plays a match eight times as fast.
+-- A balance run starts when the place has this Workspace attribute: 8 plays
+-- a match eight times as fast, as far as the machine keeps up.
 const SPEED_ATTRIBUTE = "BalanceRunSpeed"
 -- Every report printed to the output starts with this, to find them later.
 const LOG_PREFIX = "[BalanceRun]"

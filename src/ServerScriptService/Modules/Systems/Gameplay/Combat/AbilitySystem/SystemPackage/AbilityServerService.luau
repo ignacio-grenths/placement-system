@@ -231,37 +231,43 @@ local function stepChannels(now: number)
 	end
 end
 
+-- Returns whether the shot stopped on a hit.
+local function hitAlongShot(shot: Skillshot): boolean
+	local options = shot.Options
+	local hits = UnitServerService:FindInRadius(shot.Position, options.Width / 2, function(other)
+		return not shot.HitIds[other.Id]
+			and other.IsTargetable
+			and AbilityRules.matchesFilter(shot.Caster.Team, other.Team, other.Kind, options.Filter)
+	end)
+	for _, hit in hits do
+		shot.HitIds[hit.Id] = true
+		task.spawn(options.OnHit, hit)
+		if not options.Pierces then
+			return true
+		end
+	end
+	return false
+end
+
 local function stepSkillshots(dt: number)
 	for index = #skillshots, 1, -1 do
 		local shot = skillshots[index]
 		local options = shot.Options
 		local stepLength = math.min(options.Speed * dt, options.Range - shot.Traveled)
-		shot.Position += options.Direction * stepLength
-		shot.Traveled += stepLength
-		local isFinished = shot.Traveled >= options.Range
-
-		local hits = UnitServerService:FindInRadius(
-			shot.Position,
-			options.Width / 2,
-			function(other)
-				return not shot.HitIds[other.Id]
-					and other.IsTargetable
-					and AbilityRules.matchesFilter(
-						shot.Caster.Team,
-						other.Team,
-						other.Kind,
-						options.Filter
-					)
-			end
-		)
-		for _, hit in hits do
-			shot.HitIds[hit.Id] = true
-			task.spawn(options.OnHit, hit)
-			if not options.Pierces then
+		-- Checked in slices no longer than the shot is wide, so a fast shot on
+		-- a slow frame can't pass over a unit between checks.
+		local slices = math.max(math.ceil(stepLength / options.Width), 1)
+		local sliceLength = stepLength / slices
+		local isFinished = false
+		for _ = 1, slices do
+			shot.Position += options.Direction * sliceLength
+			shot.Traveled += sliceLength
+			if hitAlongShot(shot) then
 				isFinished = true
 				break
 			end
 		end
+		isFinished = isFinished or shot.Traveled >= options.Range
 
 		if isFinished then
 			skillshots[index] = skillshots[#skillshots]
