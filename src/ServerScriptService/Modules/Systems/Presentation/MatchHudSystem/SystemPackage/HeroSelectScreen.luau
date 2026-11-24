@@ -26,6 +26,7 @@ const BLOCKED_TRANSPARENCY = 0.3
 const LOCK_COLOR = Color3.fromRGB(60, 140, 90)
 const DISABLED_COLOR = Color3.fromRGB(48, 50, 60)
 const ROW_MARK_WIDTH = 4
+const ROW_TEXT_GAP = 8
 const NEUTRAL_MARK_COLOR = Color3.fromRGB(90, 100, 120)
 
 export type HeroCardView = {
@@ -91,6 +92,8 @@ type Metrics = {
 	LockButtonSize: Vector2,
 	-- Whether the footer lists the chosen hero's abilities.
 	ShowsAbilities: boolean,
+	-- Beside a teammate who hasn't hovered a hero yet.
+	ChoosingText: string,
 }
 
 type RosterRow = {
@@ -108,7 +111,7 @@ const REGULAR: Metrics = {
 	TitleTextSize = HudTheme.TitleTextSize,
 	BodyTextSize = HudTheme.BodyTextSize,
 	SmallTextSize = HudTheme.SmallTextSize,
-	RosterWidth = 220,
+	RosterWidth = 240,
 	RosterRowHeight = 40,
 	ColumnHeaderHeight = 24,
 	CardSize = Vector2.new(128, 112),
@@ -118,6 +121,7 @@ const REGULAR: Metrics = {
 	FooterHeight = 72,
 	LockButtonSize = Vector2.new(200, 56),
 	ShowsAbilities = true,
+	ChoosingText = "Choosing...",
 }
 
 -- Sized so a 667 by 375 phone shows it near full size.
@@ -138,6 +142,8 @@ const COMPACT: Metrics = {
 	FooterHeight = 48,
 	LockButtonSize = Vector2.new(150, 44),
 	ShowsAbilities = false,
+	-- Leaves the narrow roster's width to player names.
+	ChoosingText = "...",
 }
 
 local function formatSeconds(seconds: number): string
@@ -364,36 +370,51 @@ local function rosterRow(
 					else NEUTRAL_MARK_COLOR
 			end,
 		}),
-		label({
-			Name = "PlayerName",
-			Position = UDim2.fromOffset(ROW_MARK_WIDTH + 8, 0),
-			Size = UDim2.new(0.5, -ROW_MARK_WIDTH - 8, 1, 0),
-			Font = HudTheme.Font,
-			Text = function()
-				return row().Name
-			end,
-			TextColor3 = function()
-				return if row().IsBot then HudTheme.MutedTextColor else HudTheme.TextColor
-			end,
-			TextSize = function()
-				return metrics().SmallTextSize
-			end,
-		}),
-		label({
-			Name = "HeroName",
-			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.new(1, -8, 0, 0),
-			Size = UDim2.new(0.5, -8, 1, 0),
-			Text = function()
-				return row().HeroText
-			end,
-			TextColor3 = function()
-				return if row().IsLockedIn then HudTheme.TextColor else HudTheme.MutedTextColor
-			end,
-			TextSize = function()
-				return metrics().SmallTextSize
-			end,
-			TextXAlignment = Enum.TextXAlignment.Right,
+		create("Frame")({
+			Name = "Text",
+			Position = UDim2.fromOffset(ROW_MARK_WIDTH + ROW_TEXT_GAP, 0),
+			Size = UDim2.new(1, -ROW_MARK_WIDTH - ROW_TEXT_GAP * 2, 1, 0),
+			BackgroundTransparency = 1,
+
+			create("UIListLayout")({
+				FillDirection = Enum.FillDirection.Horizontal,
+				Padding = UDim.new(0, ROW_TEXT_GAP),
+			}),
+			-- Hero text is short and player names run to 20 characters, so the
+			-- name takes whatever width the hero text leaves.
+			label({
+				Name = "PlayerName",
+				LayoutOrder = 1,
+				Size = UDim2.fromScale(0, 1),
+				Font = HudTheme.Font,
+				Text = function()
+					return row().Name
+				end,
+				TextColor3 = function()
+					return if row().IsBot then HudTheme.MutedTextColor else HudTheme.TextColor
+				end,
+				TextSize = function()
+					return metrics().SmallTextSize
+				end,
+
+				create("UIFlexItem")({ FlexMode = Enum.UIFlexMode.Fill }),
+			}),
+			label({
+				Name = "HeroName",
+				LayoutOrder = 2,
+				AutomaticSize = Enum.AutomaticSize.X,
+				Size = UDim2.fromScale(0, 1),
+				Text = function()
+					return row().HeroText
+				end,
+				TextColor3 = function()
+					return if row().IsLockedIn then HudTheme.TextColor else HudTheme.MutedTextColor
+				end,
+				TextSize = function()
+					return metrics().SmallTextSize
+				end,
+				TextXAlignment = Enum.TextXAlignment.Right,
+			}),
 		}),
 	})
 end
@@ -424,7 +445,7 @@ local function heroSelectScreen(props: HeroSelectScreenProps)
 			local teammate = props.Teammates()[index]
 			if teammate then
 				local heroText = if teammate.HeroName == ""
-					then "Choosing..."
+					then metrics().ChoosingText
 					elseif teammate.IsLockedIn then teammate.HeroName
 					else `{teammate.HeroName}?`
 				table.insert(result, {
