@@ -2,6 +2,8 @@
 
 const HttpService = game:GetService("HttpService")
 
+const ModuleLoader = require("@game/ReplicatedStorage/Packages/ModuleLoader")
+
 const HeroLevelServerService = require(
 	"@game/ServerScriptService/Modules/Systems/Progression/HeroLevelSystem/SystemPackage/HeroLevelServerService"
 )
@@ -135,11 +137,17 @@ function Module:Init()
 end
 
 function Module:Start()
-	-- Without a player joining, nothing else would start the match, and Run
-	-- mode leaves the client's rendering out of the way of the simulation.
-	if isBalanceRun then
-		MatchServerService:StartBotMatch()
+	if not isBalanceRun then
+		return
 	end
+	-- Run mode has no player to start the match. Other systems build the map
+	-- and units in their own Start, so the match waits for all of them.
+	task.spawn(function()
+		while not ModuleLoader.IsServerLoaded() do
+			task.wait()
+		end
+		MatchServerService:StartBotMatch()
+	end)
 end
 
 return Module
