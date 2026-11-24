@@ -46,6 +46,7 @@ local structures: { [string]: number } = { Blue = 0, Red = 0 }
 local bosses: { [string]: number } = { Blue = 0, Red = 0 }
 local matchStartTime = 0
 local isReported = false
+local isBalanceRun = false
 
 local function getOtherTeam(team: string): string
 	return if team == "Blue" then "Red" else "Blue"
@@ -123,6 +124,7 @@ function Module:Init()
 		return
 	end
 
+	isBalanceRun = true
 	SimClock.setSpeed(math.floor(speed))
 	MatchServerService:SetPlayersSpectate(true)
 	MatchServerService.MatchStarted:Connect(onMatchStarted)
@@ -130,6 +132,14 @@ function Module:Init()
 	UnitServerService.UnitDamaged:Connect(onUnitDamaged)
 	UnitServerService.UnitDied:Connect(onUnitDied)
 	JungleServerService.CampCleared:Connect(onCampCleared)
+end
+
+function Module:Start()
+	-- Without a player joining, nothing else would start the match, and Run
+	-- mode leaves the client's rendering out of the way of the simulation.
+	if isBalanceRun then
+		MatchServerService:StartBotMatch()
+	end
 end
 
 return Module

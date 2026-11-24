@@ -418,6 +418,20 @@ function Module:SetPlayersSpectate(isOn: boolean)
 end
 
 --[[
+	Starts an all-bot match without waiting for a player to join, so a match
+	can run in Studio's Run mode with nobody connected. Needs
+	SetPlayersSpectate on, and does nothing once a match has started.
+]]
+function Module:StartBotMatch()
+	assert(isSpectating, "An all-bot match needs players to spectate")
+	if phase ~= "Waiting" then
+		return
+	end
+	startMatch()
+	fillWithBots()
+end
+
+--[[
 	Sets who chooses each bot's hero, by team and role. Nil goes back to the
 	hero set for the role in SetRoles.
 ]]
