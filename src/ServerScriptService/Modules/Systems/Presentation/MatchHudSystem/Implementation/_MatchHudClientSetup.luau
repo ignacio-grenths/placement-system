@@ -166,6 +166,9 @@ local isEndScreenDismissed = source(false)
 local minimapDots = source({} :: { MinimapDot })
 local buffViews = source({} :: { BuffView })
 local announcement = source(nil :: AnnouncementView?)
+-- Hero select covers the match, and with no hero yet the HUD has nothing to
+-- show, so it stays hidden and its buttons stay out of gamepad selection.
+local isSelecting = source(false)
 local announcementShownAt = 0
 local announcementEndsAt = 0
 local queuedAnnouncements: { AnnouncementView } = {}
@@ -301,6 +304,7 @@ end
 
 local function refreshMatchState()
 	local state = MatchNetwork.MatchState
+	isSelecting(state:GetAttribute("Phase") == "Selecting")
 	local startTime = state:GetAttribute("StartTime")
 	elapsed(
 		if typeof(startTime) == "number" and startTime > 0
@@ -555,6 +559,9 @@ local function hud(): ScreenGui
 	return create("ScreenGui")({
 		Name = "MatchHud",
 		ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
+		Enabled = function()
+			return not isSelecting()
+		end,
 
 		create("UIScale")({ Scale = Screen.uiScale }),
 
@@ -712,6 +719,9 @@ local function minimapGui(): ScreenGui
 	return create("ScreenGui")({
 		Name = "MatchMinimap",
 		ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
+		Enabled = function()
+			return not isSelecting()
+		end,
 
 		create("UIScale")({ Scale = Screen.uiScale }),
 		create("Frame")({
