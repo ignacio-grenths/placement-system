@@ -772,8 +772,12 @@ local function step(frameTime: number)
 		-- Units spawned during the loop are appended past count and wait
 		-- for the next step.
 		local count = #unitArray
-		for index = 1, count do
-			local unit = unitArray[index]
+		-- Of two units striking in the same step, the one stepped first lands
+		-- its blow first, so in a fixed order the older of two equal units won
+		-- every even fight. A random direction each step makes it a coin flip.
+		local isReversed = random:NextNumber() < 0.5
+		for offset = 0, count - 1 do
+			local unit = unitArray[if isReversed then count - offset else offset + 1]
 			if not unit.IsRemoved and not unit.IsDead then
 				stepUnit(unit, dt, now)
 			end
