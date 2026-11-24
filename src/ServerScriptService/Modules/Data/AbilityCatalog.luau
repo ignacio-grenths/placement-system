@@ -240,7 +240,7 @@ Module.Abilities = {
 		Cost = 0,
 		Targeting = "Self",
 		Range = 0,
-		Values = { Shield = { 70, 110, 150, 190 }, ShieldSeconds = 4, AllyRange = 15 },
+		Values = { Shield = { 90, 130, 170, 210 }, ShieldSeconds = 4, AllyRange = 15 },
 	},
 	["Brakk.E"] = {
 		Name = "Titan Leap",
@@ -301,7 +301,7 @@ Module.Abilities = {
 		Values = {
 			Damage = { 60, 90, 120, 150 },
 			Radius = 4.5,
-			Shield = { 60, 90, 120, 150 },
+			Shield = { 80, 110, 140, 170 },
 			ShieldSeconds = 3,
 		},
 	},
