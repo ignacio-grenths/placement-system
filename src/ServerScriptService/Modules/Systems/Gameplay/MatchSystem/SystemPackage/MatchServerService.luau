@@ -7,16 +7,22 @@ const Signal = require("@game/ServerScriptService/Modules/Utilities/Signal")
 const SimClock = require("@game/ServerScriptService/Modules/Utilities/SimClock")
 
 const MatchNetwork = require("./MatchNetwork")
+const PickRules = require("./PickRules")
 
--- Seconds between the first player joining and the match clock starting, so
--- clients finish loading before the clock runs.
+-- Seconds between the match starting and its clock running, so clients
+-- finish loading and players find their heroes first.
 const START_DELAY = 5
+-- Seconds players have to pick a hero before the match starts without them.
+const SELECT_SECONDS = 30
 const TEAMS = { "Blue", "Red" }
+const REQUESTS_PER_SECOND = 10
 
 const MatchTypes = require("./MatchTypes")
 
 type Participant = MatchTypes.Participant
 type Phase = MatchTypes.Phase
+type Pick = MatchTypes.Pick
+type PoolHero = MatchTypes.PoolHero
 type Role = MatchTypes.Role
 type ScoreEntry = MatchTypes.ScoreEntry
 type Team = MatchTypes.Team
@@ -32,15 +38,20 @@ Module.MatchStarted = Signal.new() :: Signal.Signal<number>
 Module.MatchEnded = Signal.new() :: Signal.Signal<Team>
 
 local participants: { Participant } = {}
+-- Players choosing heroes, in join order. Empty outside the Selecting phase.
+local picks: { Pick } = {}
 local roles: { Role } = {}
 local botHeroesByRole: { [string]: string? } = {}
-local rolesByHero: { [string]: Role? } = {}
-local heroPool: { string } = {}
+local heroPool: { PoolHero } = {}
 local isFillingWithBots = false
 local isSpectating = false
 local botHeroPicker: ((Team, Role) -> string)? = nil
 local phase: Phase = "Waiting"
 local startTime = 0
+-- Bumped each time selection starts, so an earlier selection's timer can tell
+-- it is stale.
+local selectRound = 0
+local lastRequestTimes: { [Player]: number? } = {}
 
 local function setPhase(newPhase: Phase)
 	phase = newPhase
@@ -63,6 +74,10 @@ local function publishScoreboard()
 	MatchNetwork.MatchState:SetAttribute("Scoreboard", HttpService:JSONEncode(entries))
 end
 
+local function publishPicks()
+	MatchNetwork.MatchState:SetAttribute("Picks", HttpService:JSONEncode(picks))
+end
+
 local function findInRole(team: Team, role: Role): Participant?
 	for _, participant in participants do
 		if participant.Team == team and participant.Role == role then
@@ -76,6 +91,15 @@ local function findByPlayer(player: Player): Participant?
 	for _, participant in participants do
 		if participant.Player == player then
 			return participant
+		end
+	end
+	return nil
+end
+
+local function findPick(player: Player): Pick?
+	for _, pick in picks do
+		if pick.UserId == player.UserId then
+			return pick
 		end
 	end
 	return nil
@@ -97,6 +121,11 @@ local function countPlayers(team: Team): number
 			count += 1
 		end
 	end
+	for _, pick in picks do
+		if pick.Team == team then
+			count += 1
+		end
+	end
 	return count
 end
 
@@ -110,25 +139,23 @@ local function isOpenForPlayer(team: Team, role: Role): boolean
 end
 
 --[[
-	Gives a joining player the first hero in the pool whose role no other
-	player on the team holds. With the pool's roles all taken, the player
-	gets any role still open, with that role's bot hero.
+	Gives a player who joins mid-match the first hero in the pool whose role
+	no other player on the team holds. With the pool's roles all taken, the
+	player gets any role still open, with that role's bot hero.
 ]]
 local function chooseHeroAndRole(team: Team): (string, Role)
-	for _, heroId in heroPool do
-		-- Annotated because luau-lsp widens string literals read from a table.
-		local role: Role? = rolesByHero[heroId]
-		if role and isOpenForPlayer(team, role) then
-			return heroId, role
+	for _, hero in heroPool do
+		if isOpenForPlayer(team, hero.Role) then
+			return hero.HeroId, hero.Role
 		end
 	end
 	for _, openRole in roles do
 		local role: Role = openRole :: Role
 		if isOpenForPlayer(team, role) then
-			return botHeroesByRole[role] or heroPool[1], role
+			return botHeroesByRole[role] or heroPool[1].HeroId, role
 		end
 	end
-	return heroPool[1], roles[1]
+	return heroPool[1].HeroId, roles[1]
 end
 
 local function addParticipant(participant: Participant)
@@ -144,6 +171,24 @@ local function removeParticipant(participant: Participant)
 		publishScoreboard()
 		Module.ParticipantRemoved:Fire(participant)
 	end
+end
+
+local function addPlayer(player: Player, team: Team, heroId: string, role: Role)
+	-- A player always takes a bot's place, never the other way around.
+	local bot = findInRole(team, role)
+	if bot then
+		removeParticipant(bot)
+	end
+	addParticipant({
+		Player = player,
+		Name = player.DisplayName,
+		Team = team,
+		Role = role,
+		HeroId = heroId,
+		HeroUnitId = nil,
+		Kills = 0,
+		Deaths = 0,
+	})
 end
 
 local function fillWithBots()
@@ -180,8 +225,105 @@ local function startMatch()
 	Module.MatchStarted:Fire(startTime)
 end
 
+local function isEveryoneLockedIn(): boolean
+	for _, pick in picks do
+		if not pick.IsLockedIn then
+			return false
+		end
+	end
+	return #picks > 0
+end
+
+local function finishSelecting()
+	local assignments = PickRules.resolve(picks, heroPool)
+	for index, pick in picks do
+		local player = Players:GetPlayerByUserId(pick.UserId)
+		if player then
+			local assignment = assignments[index]
+			addPlayer(player, pick.Team, assignment.HeroId, assignment.Role)
+		end
+	end
+	table.clear(picks)
+	publishPicks()
+	startMatch()
+	fillWithBots()
+end
+
+local function onSelectTimeUp(round: number)
+	if phase == "Selecting" and round == selectRound then
+		finishSelecting()
+	end
+end
+
+local function startSelecting()
+	selectRound += 1
+	MatchNetwork.MatchState:SetAttribute("SelectEndTime", SimClock.serverTime() + SELECT_SECONDS)
+	setPhase("Selecting")
+	SimClock.delay(SELECT_SECONDS, onSelectTimeUp, selectRound)
+end
+
+local function isRequestAllowed(player: Player): boolean
+	-- Requests arrive in real time, whatever speed the simulation runs at.
+	local now = os.clock()
+	local last = lastRequestTimes[player]
+	if last and now - last < 1 / REQUESTS_PER_SECOND then
+		return false
+	end
+	lastRequestTimes[player] = now
+	return true
+end
+
+local function onPickHero(player: Player, heroId: unknown)
+	if phase ~= "Selecting" or typeof(heroId) ~= "string" or not isRequestAllowed(player) then
+		return
+	end
+	local pick = findPick(player)
+	if
+		not pick
+		or pick.IsLockedIn
+		or pick.HeroId == heroId
+		or not PickRules.isHeroOpen(picks, heroPool, pick, heroId)
+	then
+		return
+	end
+	pick.HeroId = heroId
+	publishPicks()
+end
+
+local function onLockIn(player: Player)
+	if phase ~= "Selecting" or not isRequestAllowed(player) then
+		return
+	end
+	local pick = findPick(player)
+	if
+		not pick
+		or pick.IsLockedIn
+		or not PickRules.isHeroOpen(picks, heroPool, pick, pick.HeroId)
+	then
+		return
+	end
+	pick.IsLockedIn = true
+	-- Teammates hovering a hero of the role just taken have to choose again.
+	local role = PickRules.findRole(heroPool, pick.HeroId)
+	for _, other in picks do
+		if
+			other ~= pick
+			and other.Team == pick.Team
+			and not other.IsLockedIn
+			and PickRules.findRole(heroPool, other.HeroId) == role
+		then
+			other.HeroId = ""
+		end
+	end
+	publishPicks()
+
+	if isEveryoneLockedIn() then
+		finishSelecting()
+	end
+end
+
 local function onPlayerAdded(player: Player)
-	if phase == "Ended" or findByPlayer(player) then
+	if phase == "Ended" or findByPlayer(player) or findPick(player) then
 		return
 	end
 	if isSpectating then
@@ -194,30 +336,41 @@ local function onPlayerAdded(player: Player)
 
 	-- Annotated because luau-lsp widens a returned string literal to string.
 	local team: Team = chooseTeam()
-	local heroId: string, role: Role = chooseHeroAndRole(team)
-	-- A player always takes a bot's place, never the other way around.
-	local bot = findInRole(team, role)
-	if bot then
-		removeParticipant(bot)
+	if phase == "Playing" then
+		local heroId: string, role: Role = chooseHeroAndRole(team)
+		addPlayer(player, team, heroId, role)
+		fillWithBots()
+		return
 	end
-	addParticipant({
-		Player = player,
+
+	table.insert(picks, {
+		UserId = player.UserId,
 		Name = player.DisplayName,
 		Team = team,
-		Role = role,
-		HeroId = heroId,
-		HeroUnitId = nil,
-		Kills = 0,
-		Deaths = 0,
+		HeroId = "",
+		IsLockedIn = false,
 	})
-
+	publishPicks()
 	if phase == "Waiting" then
-		startMatch()
+		startSelecting()
 	end
-	fillWithBots()
 end
 
 local function onPlayerRemoving(player: Player)
+	lastRequestTimes[player] = nil
+
+	local pick = findPick(player)
+	if pick then
+		table.remove(picks, table.find(picks, pick) :: number)
+		publishPicks()
+		if #picks == 0 then
+			setPhase("Waiting")
+		elseif isEveryoneLockedIn() then
+			finishSelecting()
+		end
+		return
+	end
+
 	local participant = findByPlayer(player)
 	if participant then
 		removeParticipant(participant)
@@ -227,24 +380,23 @@ local function onPlayerRemoving(player: Player)
 end
 
 --[[
-	Sets the heroes players are given, in the order they are handed out.
+	Sets the heroes players may pick, each with the role it plays, in the
+	order they are handed to players who pick none.
 ]]
-function Module:SetHeroPool(heroIds: { string })
-	assert(#heroIds > 0, "The hero pool needs at least one hero")
-	heroPool = table.clone(heroIds)
+function Module:SetHeroPool(heroes: { PoolHero })
+	assert(#heroes > 0, "The hero pool needs at least one hero")
+	heroPool = table.clone(heroes)
+	MatchNetwork.MatchState:SetAttribute("HeroPool", HttpService:JSONEncode(heroPool))
 end
 
 --[[
 	Sets each team's role slots in order, and the hero a bot plays in each.
-	Every hero's role is the one it fills as a bot.
 ]]
 function Module:SetRoles(roleOrder: { Role }, botHeroes: { [string]: string })
 	roles = table.clone(roleOrder)
 	table.clear(botHeroesByRole)
-	table.clear(rolesByHero)
 	for role, heroId in botHeroes do
 		botHeroesByRole[role] = heroId
-		rolesByHero[heroId] = role :: Role
 	end
 end
 
@@ -257,8 +409,9 @@ function Module:SetFillWithBots(isOn: boolean)
 end
 
 --[[
-	Turns on watching: players who join take no slot and get no hero, so
-	every slot plays as a bot. Call it before players join.
+	Turns on watching: players who join take no slot, get no hero, and skip
+	hero selection, so every slot plays as a bot. Call it before players
+	join.
 ]]
 function Module:SetPlayersSpectate(isOn: boolean)
 	isSpectating = isOn
@@ -327,12 +480,16 @@ end
 
 function Module:Init()
 	MatchNetwork.MatchState:SetAttribute("StartTime", 0)
+	MatchNetwork.MatchState:SetAttribute("SelectEndTime", 0)
 	MatchNetwork.MatchState:SetAttribute("Winner", "")
 	setPhase("Waiting")
 	publishScoreboard()
+	publishPicks()
 
 	Players.PlayerAdded:Connect(onPlayerAdded)
 	Players.PlayerRemoving:Connect(onPlayerRemoving)
+	MatchNetwork.PickHero.OnServerEvent:Connect(onPickHero)
+	MatchNetwork.LockIn.OnServerEvent:Connect(onLockIn)
 end
 
 function Module:Start()

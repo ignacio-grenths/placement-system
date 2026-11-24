@@ -4,8 +4,9 @@ const HeroCatalog = require("@game/ServerScriptService/Modules/Data/HeroCatalog"
 
 const MatchServerService = require("../SystemPackage/MatchServerService")
 
--- Heroes players are handed, in order, each in its own role.
-const HERO_POOL = { "Haru", "Ryuka", "Torvik", "SeoDan", "Brakk" }
+-- One hero per role, handed out first to players who pick none. Every other
+-- catalog hero follows them in the pool.
+const DEFAULT_HEROES = { "Haru", "Ryuka", "Torvik", "SeoDan", "Brakk" }
 
 const MatchTypes = require("../SystemPackage/MatchTypes")
 
@@ -39,16 +40,33 @@ local function pickBotHero(_team: MatchTypes.Team, role: MatchTypes.Role): strin
 	return choices[random:NextInteger(1, #choices)]
 end
 
+local function buildHeroPool(): { MatchTypes.PoolHero }
+	local others = {}
+	for heroId in HeroCatalog.Heroes do
+		if not table.find(DEFAULT_HEROES, heroId) then
+			table.insert(others, heroId)
+		end
+	end
+	table.sort(others)
+
+	local pool: { MatchTypes.PoolHero } = {}
+	for _, heroId in DEFAULT_HEROES do
+		table.insert(pool, { HeroId = heroId, Role = HeroCatalog.Heroes[heroId].Role })
+	end
+	for _, heroId in others do
+		table.insert(pool, { HeroId = heroId, Role = HeroCatalog.Heroes[heroId].Role })
+	end
+	return pool
+end
+
 function Module:Init()
-	-- Each role's default is its hero in the pool, which is also the role a
-	-- player handed that hero plays.
-	local poolHeroes: { [string]: string } = {}
-	for _, heroId in HERO_POOL do
-		poolHeroes[HeroCatalog.Heroes[heroId].Role] = heroId
+	local defaultHeroes: { [string]: string } = {}
+	for _, heroId in DEFAULT_HEROES do
+		defaultHeroes[HeroCatalog.Heroes[heroId].Role] = heroId
 	end
 
-	MatchServerService:SetHeroPool(HERO_POOL)
-	MatchServerService:SetRoles(ROLE_ORDER, poolHeroes)
+	MatchServerService:SetHeroPool(buildHeroPool())
+	MatchServerService:SetRoles(ROLE_ORDER, defaultHeroes)
 	MatchServerService:SetBotHeroPicker(pickBotHero)
 	MatchServerService:SetFillWithBots(true)
 end

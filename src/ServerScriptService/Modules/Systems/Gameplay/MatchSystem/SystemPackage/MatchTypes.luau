@@ -1,8 +1,25 @@
 --!strict
 
 export type Team = "Blue" | "Red"
-export type Phase = "Waiting" | "Playing" | "Ended"
+export type Phase = "Waiting" | "Selecting" | "Playing" | "Ended"
 export type Role = "Top" | "Jungle" | "Mid" | "Bot" | "Support"
+
+-- A hero players may pick, and the role it plays.
+export type PoolHero = {
+	HeroId: string,
+	Role: Role,
+}
+
+-- A player's choice during hero selection, as clients read it from the
+-- MatchState attribute.
+export type Pick = {
+	UserId: number,
+	Name: string,
+	Team: Team,
+	-- "" until the player chooses a hero.
+	HeroId: string,
+	IsLockedIn: boolean,
+}
 
 -- One slot on a team, held by a player or, when no player holds it, a bot.
 export type Participant = {
