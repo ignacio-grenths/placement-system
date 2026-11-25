@@ -43,7 +43,7 @@
 @media (max-width: 560px) { .mb-lobby .body { grid-template-columns: 1fr; } .mb-lobby .friends { border-left: 0; border-top: 1px solid var(--line); } }
 </style>
 
-<rk-header tag="Plan · Anime MOBA · Whole game" title="Crashpoint Valley" sub="A 5v5, three-lane, top-down MOBA on Roblox with five original anime-inspired heroes, alien minion waves, jungle bosses, and a League-style lobby, built in four milestones starting with a playable map against bots."></rk-header>
+<rk-header tag="Plan · Anime MOBA · Whole game" title="Crashpoint Valley" sub="A 5v5, three-lane, top-down MOBA on Roblox with ten original anime-inspired heroes in a fantasy anime world, minion waves, jungle bosses, and a League-style lobby, built in four milestones starting with a playable map against bots."></rk-header>
 <rk-stats>
 5v5 | players per match, bots fill empty slots |
 5 | heroes, one per role | 2 in milestone 1
@@ -77,9 +77,9 @@ Friends | Your Roblox friends in the lobby, parties of up to 5 that queue togeth
 Ranked | Later, with a hidden skill rating and visible themed tiers
 Leavers | A bot takes over at once, and the player gets their hero back if they rejoin
 Lobby | A full-screen menu client in our own style, not a 3D hub
-Map theme | A valley where an alien mothership crashed
-Art | Heroes are anime-style figures built in code from parts (big eyes, hair, outfits, gear) and animated procedurally, so no uploads are needed. Aliens, towers, and monsters stay styled stand-ins
-Money | All heroes free. Cosmetics later, plus a Robux bundle that unlocks every rune early. Runes stay small sidegrades, and every one can be earned by playing
+Map theme | A fantasy anime world (changed 2026-11-24 from the sci-fi alien valley). The built map, aliens, monsters, and HUD are still sci-fi until MB-41 restyles them; layout and rules stay
+Art | Heroes are anime-style figures built in code from parts (big eyes, hair, outfits, gear) and animated procedurally, so no uploads are needed. Minions, towers, and monsters stay styled stand-ins, restyled as fantasy in MB-41
+Money | Five heroes free from the start, the easiest per role: Akane, Rin, Yuki, Ryuka, Brakk (changed 2026-11-24). The other five unlock with coins earned every match, or at once with Robux. Every hero has the same power budget, so buying one gives choice, not strength. Cosmetics later, plus a Robux bundle that unlocks every rune early. Runes stay small sidegrades, and every one can be earned by playing
 </rk-table>
 
 <h2>The heroes</h2>
@@ -391,6 +391,8 @@ MB-25 | Role queue with two picks, cross-server queue, bot fill after 60 s | Mat
 MB-26 | Reserve a server, teleport the party with match data, retry on failure | TeleportSystem | M3 | [todo]
 MB-27 | Wait for arrivals, bots for no-shows, leaver takeover and rejoin | MatchSystem, BotSystem | M3 | [todo]
 MB-28 | Profiles with settings and match history | DataSystem | M3 | [todo]
+MB-41 | Fantasy restyle: new world theme and names, then repaint the map, minions, jungle monsters, bosses, and HUD in a fantasy anime look | MapSystem, UnitVisualsSystem, MatchHudSystem | M3 | [todo]
+MB-42 | Coins earned every match, hero ownership saved per player, Robux products for locked heroes, and hero select that only lets you pick owned heroes (bots can use any) | DataSystem, MatchSystem, MatchHudSystem | M3 | [todo]
 MB-34 | Rune pages, account levels that unlock runes, and spell and rune picks in the lobby | RuneSystem | M3 | [todo]
 MB-35 | Robux developer product that unlocks every rune | RuneSystem | M3 | [todo]
 MB-29 | Ranked queue, hidden rating, themed tiers | RankedSystem | M4 | [todo]
@@ -421,6 +423,8 @@ Bots and the full match | bots fill the other nine slots, and a match runs from 
 <p>Approved on 2026-11-22 with the recommended defaults: working hero names, Crashpoint Valley as the working title, a small shop in M1, a 60-second queue before bots fill, and ProfileStore for player data. Still open:</p>
 <rk-decisions>
 Rune bundle price | Recommended: set it when M3 ships, once there is data on how fast players earn runes.
+Coin earn rate and hero prices | Recommended: set them with MB-42, so a player who doesn't pay can unlock a new hero every few days of play.
+Fantasy theme and names | Recommended: pick the world, minion, monster, and boss names at the start of MB-41.
 </rk-decisions>
 
 <footer>Plan for the Crashpoint Valley MOBA, from the interview on 2026-11-22, updated the same day with item pairs, runes, summoner spells, resources, the level 15 cap, and the new map features. Milestone 1 is complete.</footer>
