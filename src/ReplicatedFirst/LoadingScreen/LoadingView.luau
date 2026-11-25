@@ -5,14 +5,31 @@ const TweenService = game:GetService("TweenService")
 -- Built from plain instances: the loading screen runs from ReplicatedFirst,
 -- before ReplicatedStorage and its packages reach the client.
 const GAME_TITLE = "CRASHPOINT VALLEY"
-const SUBTITLE = "5v5 Battle Arena"
+const CHIP_TEXT = "Loading..."
 
-const TOP_COLOR = Color3.fromRGB(14, 10, 30)
-const BOTTOM_COLOR = Color3.fromRGB(44, 26, 70)
+const TOP_COLOR = Color3.fromRGB(6, 14, 16)
+const BOTTOM_COLOR = Color3.fromRGB(18, 34, 28)
+const GLOW_COLOR = Color3.fromRGB(70, 150, 110)
+const PANEL_COLOR = Color3.fromRGB(12, 24, 28)
+const PANEL_TRANSPARENCY = 0.15
 const GOLD_COLOR = Color3.fromRGB(240, 200, 110)
-const TEXT_COLOR = Color3.fromRGB(240, 236, 250)
-const MUTED_TEXT_COLOR = Color3.fromRGB(176, 164, 205)
-const BAR_BACKGROUND_COLOR = Color3.fromRGB(10, 8, 22)
+const DARK_GOLD_COLOR = Color3.fromRGB(170, 120, 40)
+const TEXT_COLOR = Color3.fromRGB(240, 230, 210)
+const MUTED_TEXT_COLOR = Color3.fromRGB(176, 168, 145)
+const BAR_BACKGROUND_COLOR = Color3.fromRGB(4, 10, 12)
+
+-- Width over height. The panel stays between the two widths, in pixels.
+const PANEL_ASPECT = 2.3
+const MAX_PANEL_WIDTH = 760
+const MIN_PANEL_WIDTH = 300
+const INNER_FRAME_INSET = 8
+const GEM_SIZE = 12
+const CORNERS = {
+	Vector2.new(0, 0),
+	Vector2.new(1, 0),
+	Vector2.new(0, 1),
+	Vector2.new(1, 1),
+}
 
 -- Seconds the bar takes to glide to a new value.
 const PROGRESS_TWEEN_SECONDS = 0.35
@@ -21,6 +38,7 @@ export type LoadingView = typeof(setmetatable(
 	{} :: {
 		_Root: Frame,
 		_Fill: Frame,
+		_Percent: TextLabel,
 		_Status: TextLabel,
 		_Tip: TextLabel,
 	},
@@ -47,6 +65,15 @@ local function addCorner(parent: GuiObject, radius: UDim)
 	corner.Parent = parent
 end
 
+local function addStroke(parent: GuiObject, color: Color3, thickness: number, transparency: number)
+	local stroke = Instance.new("UIStroke")
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Color = color
+	stroke.Thickness = thickness
+	stroke.Transparency = transparency
+	stroke.Parent = parent
+end
+
 local function makeLabel(
 	name: string,
 	font: Enum.Font,
@@ -66,6 +93,82 @@ local function makeLabel(
 	return label
 end
 
+local function makeGem(parent: GuiObject, corner: Vector2)
+	local gem = Instance.new("Frame")
+	gem.Name = "Gem"
+	gem.AnchorPoint = Vector2.new(0.5, 0.5)
+	gem.Position = UDim2.fromScale(corner.X, corner.Y)
+	gem.Size = UDim2.fromOffset(GEM_SIZE, GEM_SIZE)
+	gem.Rotation = 45
+	gem.BackgroundColor3 = GOLD_COLOR
+	gem.BorderSizePixel = 0
+	gem.ZIndex = 3
+	addStroke(gem, DARK_GOLD_COLOR, 1, 0)
+	gem.Parent = parent
+end
+
+local function makeBackdrop(root: Frame)
+	local gradient = Instance.new("UIGradient")
+	gradient.Color = ColorSequence.new(TOP_COLOR, BOTTOM_COLOR)
+	gradient.Rotation = 90
+	gradient.Parent = root
+
+	local glow = Instance.new("Frame")
+	glow.Name = "Glow"
+	glow.AnchorPoint = Vector2.new(0.5, 0.5)
+	glow.Position = UDim2.fromScale(0.5, 0.55)
+	glow.Size = UDim2.fromScale(0.9, 0.8)
+	glow.BackgroundColor3 = GLOW_COLOR
+	glow.BackgroundTransparency = 0.82
+	glow.BorderSizePixel = 0
+	addCorner(glow, UDim.new(0.5, 0))
+	local fade = Instance.new("UIGradient")
+	fade.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.5, 0),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	fade.Parent = glow
+	glow.Parent = root
+end
+
+local function makeTipBox(panel: Frame): TextLabel
+	local box = Instance.new("Frame")
+	box.Name = "TipBox"
+	box.AnchorPoint = Vector2.new(0.5, 0)
+	box.Position = UDim2.fromScale(0.5, 0.6)
+	box.Size = UDim2.fromScale(0.66, 0.26)
+	box.BackgroundColor3 = BAR_BACKGROUND_COLOR
+	box.BackgroundTransparency = 0.25
+	box.BorderSizePixel = 0
+	addCorner(box, UDim.new(0, 3))
+	addStroke(box, GOLD_COLOR, 1, 0.45)
+	for _, corner in CORNERS do
+		local notch = Instance.new("Frame")
+		notch.Name = "Notch"
+		notch.AnchorPoint = corner
+		notch.Position = UDim2.fromScale(corner.X, corner.Y)
+		notch.Size = UDim2.fromOffset(8, 8)
+		notch.BackgroundColor3 = GOLD_COLOR
+		notch.BorderSizePixel = 0
+		notch.Parent = box
+	end
+
+	local heading = makeLabel("Heading", Enum.Font.GothamBold, 14, GOLD_COLOR)
+	heading.Position = UDim2.fromScale(0.05, 0.1)
+	heading.Size = UDim2.fromScale(0.9, 0.28)
+	heading.Text = "TIP"
+	heading.Parent = box
+
+	local tip = makeLabel("Tip", Enum.Font.GothamMedium, 18, TEXT_COLOR)
+	tip.Position = UDim2.fromScale(0.05, 0.4)
+	tip.Size = UDim2.fromScale(0.9, 0.5)
+	tip.Parent = box
+
+	box.Parent = panel
+	return tip
+end
+
 --[[
 	Builds the loading screen inside the parent, filling it.
 ]]
@@ -77,85 +180,132 @@ function Module.new(parent: Instance): LoadingView
 	root.Size = UDim2.fromScale(1, 1)
 	-- Swallows clicks, so nothing underneath reacts while loading.
 	root.Active = true
-	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new(TOP_COLOR, BOTTOM_COLOR)
-	gradient.Rotation = 90
-	gradient.Parent = root
+	makeBackdrop(root)
 
-	local title = makeLabel("Title", Enum.Font.Fondamento, 96, GOLD_COLOR)
-	title.AnchorPoint = Vector2.new(0.5, 0.5)
-	title.Position = UDim2.fromScale(0.5, 0.4)
-	title.Size = UDim2.fromScale(0.86, 0.16)
+	local panel = Instance.new("Frame")
+	panel.Name = "Panel"
+	panel.AnchorPoint = Vector2.new(0.5, 0.5)
+	panel.Position = UDim2.fromScale(0.5, 0.58)
+	panel.Size = UDim2.fromScale(0.62, 1)
+	panel.BackgroundColor3 = PANEL_COLOR
+	panel.BackgroundTransparency = PANEL_TRANSPARENCY
+	panel.BorderSizePixel = 0
+	addCorner(panel, UDim.new(0, 3))
+	addStroke(panel, GOLD_COLOR, 2, 0.1)
+	local aspect = Instance.new("UIAspectRatioConstraint")
+	aspect.AspectRatio = PANEL_ASPECT
+	aspect.Parent = panel
+	local panelSize = Instance.new("UISizeConstraint")
+	panelSize.MinSize = Vector2.new(MIN_PANEL_WIDTH, 0)
+	panelSize.MaxSize = Vector2.new(MAX_PANEL_WIDTH, math.huge)
+	panelSize.Parent = panel
+	panel.Parent = root
+
+	local innerFrame = Instance.new("Frame")
+	innerFrame.Name = "InnerFrame"
+	innerFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+	innerFrame.Position = UDim2.fromScale(0.5, 0.5)
+	innerFrame.Size = UDim2.new(1, -INNER_FRAME_INSET * 2, 1, -INNER_FRAME_INSET * 2)
+	innerFrame.BackgroundTransparency = 1
+	addCorner(innerFrame, UDim.new(0, 2))
+	addStroke(innerFrame, GOLD_COLOR, 1, 0.65)
+	innerFrame.Parent = panel
+	for _, corner in CORNERS do
+		makeGem(panel, corner)
+	end
+
+	local title = makeLabel("Title", Enum.Font.Fondamento, 80, GOLD_COLOR)
+	title.AnchorPoint = Vector2.new(0.5, 1)
+	title.Position = UDim2.new(0.5, 0, 0, -34)
+	title.Size = UDim2.fromScale(1.2, 0.32)
 	title.Text = GAME_TITLE
 	local titleStroke = Instance.new("UIStroke")
 	titleStroke.Color = Color3.fromRGB(70, 40, 10)
 	titleStroke.Thickness = 2
 	titleStroke.Parent = title
-	title.Parent = root
+	title.Parent = panel
 
-	local subtitle = makeLabel("Subtitle", Enum.Font.GothamMedium, 28, MUTED_TEXT_COLOR)
-	subtitle.AnchorPoint = Vector2.new(0.5, 0)
-	subtitle.Position = UDim2.fromScale(0.5, 0.49)
-	subtitle.Size = UDim2.fromScale(0.6, 0.045)
-	subtitle.Text = SUBTITLE
-	subtitle.Parent = root
+	local chip = Instance.new("Frame")
+	chip.Name = "Chip"
+	chip.AnchorPoint = Vector2.new(0.5, 0.5)
+	chip.Position = UDim2.fromScale(0.5, 0)
+	chip.Size = UDim2.fromScale(0.26, 0.15)
+	chip.BackgroundColor3 = PANEL_COLOR
+	chip.BorderSizePixel = 0
+	chip.ZIndex = 2
+	addCorner(chip, UDim.new(0, 3))
+	addStroke(chip, GOLD_COLOR, 2, 0.1)
+	local chipText = makeLabel("Text", Enum.Font.Fondamento, 30, GOLD_COLOR)
+	chipText.Size = UDim2.fromScale(1, 1)
+	chipText.Text = CHIP_TEXT
+	chipText.ZIndex = 2
+	chipText.Parent = chip
+	chip.Parent = panel
 
-	local status = makeLabel("Status", Enum.Font.GothamBold, 22, TEXT_COLOR)
-	status.AnchorPoint = Vector2.new(0.5, 1)
-	status.Position = UDim2.new(0.5, 0, 0.8, -10)
-	status.Size = UDim2.fromScale(0.6, 0.035)
-	status.Parent = root
+	local status = makeLabel("Status", Enum.Font.GothamMedium, 18, MUTED_TEXT_COLOR)
+	status.AnchorPoint = Vector2.new(0.5, 0)
+	status.Position = UDim2.fromScale(0.5, 0.18)
+	status.Size = UDim2.fromScale(0.8, 0.1)
+	status.Parent = panel
 
 	local bar = Instance.new("Frame")
 	bar.Name = "Bar"
-	bar.AnchorPoint = Vector2.new(0.5, 0)
+	bar.AnchorPoint = Vector2.new(0, 0.5)
+	bar.Position = UDim2.fromScale(0.1, 0.4)
+	bar.Size = UDim2.fromScale(0.68, 0.065)
 	bar.BackgroundColor3 = BAR_BACKGROUND_COLOR
 	bar.BorderSizePixel = 0
-	bar.Position = UDim2.fromScale(0.5, 0.8)
-	bar.Size = UDim2.new(0.5, 0, 0, 10)
 	addCorner(bar, UDim.new(1, 0))
-	local barSize = Instance.new("UISizeConstraint")
-	barSize.MinSize = Vector2.new(240, 0)
-	barSize.MaxSize = Vector2.new(640, math.huge)
-	barSize.Parent = bar
-	local barStroke = Instance.new("UIStroke")
-	barStroke.Color = GOLD_COLOR
-	barStroke.Transparency = 0.6
-	barStroke.Parent = bar
-	bar.Parent = root
+	addStroke(bar, GOLD_COLOR, 1, 0.5)
+	bar.Parent = panel
 
 	local fill = Instance.new("Frame")
 	fill.Name = "Fill"
-	fill.BackgroundColor3 = GOLD_COLOR
+	fill.BackgroundColor3 = Color3.new(1, 1, 1)
 	fill.BorderSizePixel = 0
 	fill.Size = UDim2.fromScale(0, 1)
 	addCorner(fill, UDim.new(1, 0))
+	local fillGradient = Instance.new("UIGradient")
+	fillGradient.Color = ColorSequence.new(DARK_GOLD_COLOR, GOLD_COLOR)
+	fillGradient.Parent = fill
+	local fillGlow = Instance.new("UIStroke")
+	fillGlow.Color = GOLD_COLOR
+	fillGlow.Thickness = 3
+	fillGlow.Transparency = 0.7
+	fillGlow.Parent = fill
 	fill.Parent = bar
 
-	local tip = makeLabel("Tip", Enum.Font.GothamMedium, 20, MUTED_TEXT_COLOR)
-	tip.AnchorPoint = Vector2.new(0.5, 0)
-	tip.Position = UDim2.new(0.5, 0, 0.8, 26)
-	tip.Size = UDim2.fromScale(0.8, 0.06)
-	tip.Parent = root
+	local percent = makeLabel("Percent", Enum.Font.GothamBold, 30, GOLD_COLOR)
+	percent.AnchorPoint = Vector2.new(0, 0.5)
+	percent.Position = UDim2.fromScale(0.8, 0.4)
+	percent.Size = UDim2.fromScale(0.12, 0.16)
+	percent.TextXAlignment = Enum.TextXAlignment.Left
+	percent.Text = "0%"
+	percent.Parent = panel
+
+	const tip = makeTipBox(panel)
 
 	root.Parent = parent
 
 	return setmetatable({
 		_Root = root,
 		_Fill = fill,
+		_Percent = percent,
 		_Status = status,
 		_Tip = tip,
 	}, LoadingViewMethods)
 end
 
 --[[
-	Glides the bar to the given fill, from 0 to 1.
+	Glides the bar to the given fill, from 0 to 1, and shows it as a percent.
 ]]
 function LoadingViewMethods.SetProgress(self: LoadingView, alpha: number)
+	local clamped = math.clamp(alpha, 0, 1)
 	local tweenInfo = TweenInfo.new(PROGRESS_TWEEN_SECONDS, Enum.EasingStyle.Quad)
 	TweenService:Create(self._Fill, tweenInfo, {
-		Size = UDim2.fromScale(math.clamp(alpha, 0, 1), 1),
+		Size = UDim2.fromScale(clamped, 1),
 	}):Play()
+	self._Percent.Text = `{math.floor(clamped * 100)}%`
 end
 
 function LoadingViewMethods.SetStatus(self: LoadingView, text: string)
