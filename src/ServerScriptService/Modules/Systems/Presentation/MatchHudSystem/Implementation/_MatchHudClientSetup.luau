@@ -9,6 +9,7 @@ const Vide = require("@game/ReplicatedStorage/Packages/vide")
 
 const create = Vide.create
 const mount = Vide.mount
+const show = Vide.show
 const source = Vide.source
 
 const AbilityClientService = require(
@@ -556,6 +557,83 @@ local function hud(): ScreenGui
 		return Screen.isTouchLayout()
 	end
 
+	-- Desktop and touch place these differently, so each layout builds its
+	-- own copies.
+	local function buffBar(layoutOrder: number): Frame
+		local bar = BuffBar({
+			Buffs = buffViews,
+		})
+		bar.LayoutOrder = layoutOrder
+		return bar
+	end
+	local function itemBar(layoutOrder: number): Frame
+		local bar = ItemBar({
+			Items = itemSlots,
+			Gold = gold,
+			IsAutoRanking = isAutoRanking,
+			OnUse = function(slot: number)
+				ItemShopClientService:RequestUse(slot)
+			end,
+			OnShopPressed = function()
+				isShopOpen(not isShopOpen())
+			end,
+			OnAutoRankPressed = function()
+				HeroLevelClientService:SetAutoRanking(not isAutoRanking())
+			end,
+		})
+		bar.LayoutOrder = layoutOrder
+		return bar
+	end
+	local function heroStatus(layoutOrder: number): Frame
+		local status = HeroStatus({
+			HeroName = function()
+				return heroState().Name
+			end,
+			Health = function()
+				return heroState().Health
+			end,
+			MaxHealth = function()
+				return heroState().MaxHealth
+			end,
+			Shield = function()
+				return heroState().Shield
+			end,
+			Resource = function()
+				return heroState().Resource
+			end,
+			MaxResource = function()
+				return heroState().MaxResource
+			end,
+			ResourceKind = function()
+				return heroState().ResourceKind
+			end,
+			IsDead = function()
+				return heroState().IsDead
+			end,
+			Level = function()
+				return heroState().Level
+			end,
+			XpShare = function()
+				return heroState().XpShare
+			end,
+		})
+		status.LayoutOrder = layoutOrder
+		return status
+	end
+	local function abilityBar(layoutOrder: number): Frame
+		local bar = AbilityBar({
+			Abilities = abilities,
+			Channel = channel,
+			IsTouch = isTouch,
+			OnCast = onCast,
+			OnRankUp = function(slot: string)
+				HeroLevelClientService:RequestRankUp(slot)
+			end,
+		})
+		bar.LayoutOrder = layoutOrder
+		return bar
+	end
+
 	return create("ScreenGui")({
 		Name = "MatchHud",
 		ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
@@ -590,84 +668,66 @@ local function hud(): ScreenGui
 			}),
 		}),
 
-		-- Bottom left on a desktop; top left on touch, where the thumbs are not.
-		create("Frame")({
-			Name = "StatusDock",
-			BackgroundTransparency = 1,
-			AutomaticSize = Enum.AutomaticSize.XY,
-			AnchorPoint = function()
-				return if isTouch() then Vector2.zero else Vector2.new(0, 1)
-			end,
-			Position = function()
-				return if isTouch()
-					then UDim2.fromOffset(TOUCH_EDGE_MARGIN, TOUCH_EDGE_MARGIN)
-					else UDim2.new(0, EDGE_MARGIN, 1, -EDGE_MARGIN)
-			end,
+		show(isTouch, function()
+			return {
+				-- Top left, where the thumbs are not; the abilities sit in reach
+				-- of the right thumb.
+				create("Frame")({
+					Name = "StatusDock",
+					BackgroundTransparency = 1,
+					AutomaticSize = Enum.AutomaticSize.XY,
+					Position = UDim2.fromOffset(TOUCH_EDGE_MARGIN, TOUCH_EDGE_MARGIN),
 
-			create("UIListLayout")({
-				FillDirection = Enum.FillDirection.Vertical,
-				Padding = UDim.new(0, STATUS_GAP),
-			}),
-			BuffBar({
-				Buffs = buffViews,
-			}),
-			ItemBar({
-				Items = itemSlots,
-				Gold = gold,
-				IsAutoRanking = isAutoRanking,
-				OnUse = function(slot: number)
-					ItemShopClientService:RequestUse(slot)
-				end,
-				OnShopPressed = function()
-					isShopOpen(not isShopOpen())
-				end,
-				OnAutoRankPressed = function()
-					HeroLevelClientService:SetAutoRanking(not isAutoRanking())
-				end,
-			}),
-			HeroStatus({
-				HeroName = function()
-					return heroState().Name
-				end,
-				Health = function()
-					return heroState().Health
-				end,
-				MaxHealth = function()
-					return heroState().MaxHealth
-				end,
-				Shield = function()
-					return heroState().Shield
-				end,
-				Resource = function()
-					return heroState().Resource
-				end,
-				MaxResource = function()
-					return heroState().MaxResource
-				end,
-				ResourceKind = function()
-					return heroState().ResourceKind
-				end,
-				IsDead = function()
-					return heroState().IsDead
-				end,
-				Level = function()
-					return heroState().Level
-				end,
-				XpShare = function()
-					return heroState().XpShare
-				end,
-			}),
-		}),
+					create("UIListLayout")({
+						FillDirection = Enum.FillDirection.Vertical,
+						Padding = UDim.new(0, STATUS_GAP),
+					}),
+					buffBar(1),
+					itemBar(2),
+					heroStatus(3),
+				}),
+				abilityBar(0),
+			}
+		end, function()
+			-- Everything the player checks mid-fight in one cluster, so the
+			-- eyes barely move: abilities over health, items beside them.
+			return create("Frame")({
+				Name = "BottomDock",
+				BackgroundTransparency = 1,
+				AutomaticSize = Enum.AutomaticSize.XY,
+				AnchorPoint = Vector2.new(0.5, 1),
+				-- Centered in the room left of the minimap, so a narrow window
+				-- never overlaps the two.
+				Position = UDim2.new(
+					0.5,
+					-(DESKTOP_MINIMAP_SIZE + EDGE_MARGIN) / 2,
+					1,
+					-EDGE_MARGIN
+				),
 
-		AbilityBar({
-			Abilities = abilities,
-			Channel = channel,
-			IsTouch = isTouch,
-			OnCast = onCast,
-			OnRankUp = function(slot: string)
-				HeroLevelClientService:RequestRankUp(slot)
-			end,
-		}),
+				create("UIListLayout")({
+					FillDirection = Enum.FillDirection.Horizontal,
+					VerticalAlignment = Enum.VerticalAlignment.Bottom,
+					Padding = UDim.new(0, STATUS_GAP * 2),
+				}),
+				create("Frame")({
+					Name = "Center",
+					LayoutOrder = 1,
+					BackgroundTransparency = 1,
+					AutomaticSize = Enum.AutomaticSize.XY,
+
+					create("UIListLayout")({
+						FillDirection = Enum.FillDirection.Vertical,
+						HorizontalAlignment = Enum.HorizontalAlignment.Center,
+						Padding = UDim.new(0, STATUS_GAP),
+					}),
+					buffBar(1),
+					abilityBar(2),
+					heroStatus(3),
+				}),
+				itemBar(2),
+			})
+		end),
 
 		ShopPanel({
 			Items = shopItems,
