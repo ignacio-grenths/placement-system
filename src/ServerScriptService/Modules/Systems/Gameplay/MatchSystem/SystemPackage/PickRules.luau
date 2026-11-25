@@ -50,6 +50,19 @@ function Module.isHeroOpen(picks: { Pick }, pool: { PoolHero }, pick: Pick, hero
 end
 
 --[[
+	Returns whether every pick's player has finished loading, keyed by user
+	id.
+]]
+function Module.isEveryoneLoaded(picks: { Pick }, loadedUserIds: { [number]: boolean? }): boolean
+	for _, pick in picks do
+		if not loadedUserIds[pick.UserId] then
+			return false
+		end
+	end
+	return true
+end
+
+--[[
 	Gives every pick a hero once selection ends, with one player per role on
 	each team. Locked heroes come first, then hovered heroes in join order
 	while their role is open, and everyone left gets the first pool hero

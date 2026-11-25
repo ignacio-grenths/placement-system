@@ -115,4 +115,11 @@ describe("PickRules", function()
 		end
 		expect(heroIds).toEqual(row.Expected)
 	end)
+
+	it("counts everyone loaded once every pick's player has loaded", function()
+		local picks = { makePick(1, "Blue", "", false), makePick(2, "Red", "", false) }
+
+		expect(PickRules.isEveryoneLoaded(picks, { [1] = true })).toBe(false)
+		expect(PickRules.isEveryoneLoaded(picks, { [1] = true, [2] = true })).toBe(true)
+	end)
 end)

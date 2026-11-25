@@ -14,6 +14,9 @@ const PickRules = require("./PickRules")
 const START_DELAY = 5
 -- Seconds players have to pick a hero before the match starts without them.
 const SELECT_SECONDS = 30
+-- Most seconds the countdown waits for players to load, so one stuck client
+-- can't hold the match.
+const LOAD_WAIT_SECONDS = 20
 const TEAMS = { "Blue", "Red" }
 const REQUESTS_PER_SECOND = 10
 
@@ -51,6 +54,8 @@ local startTime = 0
 -- Bumped each time selection starts, so an earlier selection's timer can tell
 -- it is stale.
 local selectRound = 0
+local isCountingDown = false
+local loadedUserIds: { [number]: boolean? } = {}
 local lastRequestTimes: { [Player]: number? } = {}
 
 local function setPhase(newPhase: Phase)
@@ -255,11 +260,38 @@ local function onSelectTimeUp(round: number)
 	end
 end
 
+local function startCountdown(round: number)
+	if phase ~= "Selecting" or round ~= selectRound or isCountingDown then
+		return
+	end
+	isCountingDown = true
+	MatchNetwork.MatchState:SetAttribute("SelectEndTime", SimClock.serverTime() + SELECT_SECONDS)
+	SimClock.delay(SELECT_SECONDS, onSelectTimeUp, round)
+end
+
+local function startCountdownIfLoaded()
+	if PickRules.isEveryoneLoaded(picks, loadedUserIds) then
+		startCountdown(selectRound)
+	end
+end
+
 local function startSelecting()
 	selectRound += 1
-	MatchNetwork.MatchState:SetAttribute("SelectEndTime", SimClock.serverTime() + SELECT_SECONDS)
+	isCountingDown = false
+	MatchNetwork.MatchState:SetAttribute("SelectEndTime", 0)
 	setPhase("Selecting")
-	SimClock.delay(SELECT_SECONDS, onSelectTimeUp, selectRound)
+	SimClock.delay(LOAD_WAIT_SECONDS, startCountdown, selectRound)
+	startCountdownIfLoaded()
+end
+
+local function onLoaded(player: Player)
+	if loadedUserIds[player.UserId] then
+		return
+	end
+	loadedUserIds[player.UserId] = true
+	if phase == "Selecting" then
+		startCountdownIfLoaded()
+	end
 end
 
 local function isRequestAllowed(player: Player): boolean
@@ -358,6 +390,7 @@ end
 
 local function onPlayerRemoving(player: Player)
 	lastRequestTimes[player] = nil
+	loadedUserIds[player.UserId] = nil
 
 	local pick = findPick(player)
 	if pick then
@@ -367,6 +400,8 @@ local function onPlayerRemoving(player: Player)
 			setPhase("Waiting")
 		elseif isEveryoneLockedIn() then
 			finishSelecting()
+		else
+			startCountdownIfLoaded()
 		end
 		return
 	end
@@ -504,6 +539,7 @@ function Module:Init()
 	Players.PlayerRemoving:Connect(onPlayerRemoving)
 	MatchNetwork.PickHero.OnServerEvent:Connect(onPickHero)
 	MatchNetwork.LockIn.OnServerEvent:Connect(onLockIn)
+	MatchNetwork.Loaded.OnServerEvent:Connect(onLoaded)
 end
 
 function Module:Start()

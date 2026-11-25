@@ -28,6 +28,9 @@ const DISPLAY_ORDER = 10
 -- Seconds a tapped hero shows as chosen before the server's answer, in case
 -- the server refuses it without changing the picks.
 const REQUEST_TIMEOUT = 1
+-- Set on the local player by the client Start script once every system has
+-- started.
+const LOADED_ATTRIBUTE = "IsClientLoaded"
 const WATCHED_ATTRIBUTES = { "Phase", "Picks", "HeroPool", "SelectEndTime" }
 
 const MatchTypes = require(
@@ -47,7 +50,7 @@ local team = source("Blue")
 local teammates = source({} :: { TeammateView })
 local selectedHeroId = source(nil :: string?)
 local isLockedIn = source(false)
-local secondsLeft = source(0)
+local secondsLeft = source(nil :: number?)
 local requestedHeroId: string? = nil
 local screenGui: ScreenGui? = nil
 
@@ -167,9 +170,19 @@ local function onHeartbeat()
 		return
 	end
 	local endTime = MatchNetwork.MatchState:GetAttribute("SelectEndTime")
-	if typeof(endTime) == "number" then
+	if typeof(endTime) == "number" and endTime > 0 then
 		secondsLeft(math.max(0, math.ceil(endTime - workspace:GetServerTimeNow())))
+	else
+		secondsLeft(nil)
 	end
+end
+
+local function reportLoadedIfReady()
+	if Players.LocalPlayer:GetAttribute(LOADED_ATTRIBUTE) then
+		MatchNetwork.Loaded:FireServer()
+		return true
+	end
+	return false
 end
 
 local function app(): ScreenGui
@@ -205,6 +218,17 @@ function Module:Start()
 		MatchNetwork.MatchState:GetAttributeChangedSignal(name):Connect(handler)
 	end
 	RunService.Heartbeat:Connect(onHeartbeat)
+
+	if not reportLoadedIfReady() then
+		local connection: RBXScriptConnection
+		connection = Players.LocalPlayer
+			:GetAttributeChangedSignal(LOADED_ATTRIBUTE)
+			:Connect(function()
+				if reportLoadedIfReady() then
+					connection:Disconnect()
+				end
+			end)
+	end
 
 	task.spawn(function()
 		local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")

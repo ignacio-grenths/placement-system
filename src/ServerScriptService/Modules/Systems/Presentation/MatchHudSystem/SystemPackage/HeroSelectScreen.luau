@@ -64,7 +64,8 @@ export type HeroSelectScreenProps = {
 	TeamSize: number,
 	SelectedHeroId: () -> string?,
 	IsLockedIn: () -> boolean,
-	SecondsLeft: () -> number,
+	-- Nil while the countdown waits for players to load.
+	SecondsLeft: () -> number?,
 	IsCompact: () -> boolean,
 	-- Room the panel may take, in UI units. It shrinks to fit.
 	MaxSize: () -> Vector2,
@@ -629,7 +630,11 @@ local function heroSelectScreen(props: HeroSelectScreenProps)
 							Size = UDim2.fromScale(0.5, 1),
 							Font = HudTheme.Font,
 							Text = function()
-								return `Match starts in {formatSeconds(props.SecondsLeft())}`
+								local secondsLeft = props.SecondsLeft()
+								if secondsLeft then
+									return `Match starts in {formatSeconds(secondsLeft)}`
+								end
+								return "Waiting for players to load"
 							end,
 							TextColor3 = HudTheme.MutedTextColor,
 							TextSize = function()

@@ -53,7 +53,9 @@ const CONTROLS = {
 	),
 	Timer = UILabs.Ordered(
 		UILabs.ControlGroup({
-			SecondsLeft = UILabs.Ordered(UILabs.Slider(23, 0, 30, 1), 1),
+			-- On, the countdown hasn't started and the slider is ignored.
+			IsWaitingForLoads = UILabs.Ordered(false, 1),
+			SecondsLeft = UILabs.Ordered(UILabs.Slider(23, 0, 30, 1), 2),
 		}),
 		2
 	),
@@ -80,6 +82,7 @@ type StoryProps = {
 			LongNames: () -> boolean,
 		},
 		Timer: {
+			IsWaitingForLoads: () -> boolean,
 			SecondsLeft: () -> number,
 		},
 		Layout: {
@@ -175,7 +178,10 @@ local function story(props: StoryProps)
 		TeamSize = 5,
 		SelectedHeroId = selected,
 		IsLockedIn = isLockedIn,
-		SecondsLeft = props.controls.Timer.SecondsLeft,
+		SecondsLeft = function()
+			local timer = props.controls.Timer
+			return if timer.IsWaitingForLoads() then nil else timer.SecondsLeft()
+		end,
 		IsCompact = props.controls.Layout.IsCompact,
 		MaxSize = function()
 			return Vector2.new(props.controls.Layout.MaxWidth(), props.controls.Layout.MaxHeight())
