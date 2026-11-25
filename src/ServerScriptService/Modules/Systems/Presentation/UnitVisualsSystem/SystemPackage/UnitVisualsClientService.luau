@@ -4,6 +4,7 @@ const RunService = game:GetService("RunService")
 const TweenService = game:GetService("TweenService")
 
 const GroundPlane = require("@game/ServerScriptService/Modules/Utilities/GroundPlane")
+const MapGround = require("@game/ServerScriptService/Modules/Data/MapGround")
 const UnitClientService = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/Combat/UnitSystem/SystemPackage/UnitClientService"
 )
@@ -753,16 +754,17 @@ local function render(deltaTime: number)
 		local bob = if visual.BobAmplitude > 0
 			then math.sin(now * BOB_SPEED + visual.BobPhase) * visual.BobAmplitude
 			else 0
+		local ground = MapGround.getStandingHeight(position.X, position.Z)
 		table.insert(movedParts, visual.Body)
 		table.insert(
 			movedCFrames,
-			CFrame.new(position.X, visual.HeightOffset + bob, position.Z)
+			CFrame.new(position.X, ground + visual.HeightOffset + bob, position.Z)
 				* CFrame.Angles(0, facing, 0)
 				* visual.Rotation
 		)
 		local rig = visual.Rig
 		if rig then
-			local feet = CFrame.new(position.X, GROUND_CLEARANCE + bob, position.Z)
+			local feet = CFrame.new(position.X, ground + GROUND_CLEARANCE + bob, position.Z)
 				* CFrame.Angles(0, facing, 0)
 			CharacterRig.pose(rig, feet, deltaTime, now, movedParts, movedCFrames)
 			if

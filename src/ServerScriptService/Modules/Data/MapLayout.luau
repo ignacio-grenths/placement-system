@@ -255,6 +255,15 @@ Module.HalfSize = DRAWING_CENTER * SCALE
 Module.LaneWidth = 18
 Module.RiverWidth = 45
 
+-- Radii in studs of each camp's pit, by camp kind.
+Module.CampRadii = {
+	Small = 6,
+	CrystalGolem = 9,
+	EmberBeetle = 9,
+	Skyray = 18,
+	HiveQueen = 26,
+} :: { [CampKind]: number }
+
 Module.LaneNames = LANE_NAMES
 
 Module.Routes = buildRoutes()

@@ -9,6 +9,10 @@ const RING_SEGMENT_LENGTH = 5
 const MIN_RING_SEGMENTS = 12
 -- Terrain is stored in cells of this many studs.
 const VOXEL_SIZE = 4
+-- Cells of ground painted under height zero, deep enough for the river's
+-- bed.
+const GROUND_LAYERS = 4
+const SPRAY_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 
 export type PropShape = "Block" | "Wedge" | "Cylinder" | "Ball"
 
@@ -17,6 +21,9 @@ export type SurfaceOptions = {
 	Material: Enum.Material?,
 	-- Zero when nil.
 	Transparency: number?,
+	-- Studs the shape sits above the ground's surface, negative below it.
+	-- Zero when nil.
+	Elevation: number?,
 }
 
 export type PropOptions = {
@@ -63,38 +70,70 @@ local function createPart(color: Color3, options: SurfaceOptions?): Part
 end
 
 -- Layer 0 is the ground's surface, so layers start above 0.
-local function getLayerCenterY(layer: number): number
-	return layer * LAYER_HEIGHT - FLAT_THICKNESS / 2
+local function getLayerCenterY(layer: number, options: SurfaceOptions?): number
+	local elevation = if options and options.Elevation then options.Elevation else 0
+	return layer * LAYER_HEIGHT - FLAT_THICKNESS / 2 + elevation
 end
 
 --[[
-	Lays flat terrain over the square, its surface at height zero, and asks
-	pickMaterial for the material of each 4-stud column by its center.
-	Neighboring materials blend into each other at their edges.
+	Lays terrain over the square and asks pickGround for the material and
+	surface height of each 4-stud column by its center. Heights run from 16
+	studs below zero up to zero, and ground below waterLevel is flooded up to
+	it. Neighboring materials blend into each other at their edges.
 ]]
-function Module:PaintGround(halfSize: number, pickMaterial: (x: number, z: number) -> Enum.Material)
+function Module:PaintGround(
+	halfSize: number,
+	pickGround: (x: number, z: number) -> (Enum.Material, number),
+	waterLevel: number
+)
 	local cellsPerSide = math.ceil(halfSize / VOXEL_SIZE) * 2
 	local corner = cellsPerSide / 2 * VOXEL_SIZE
+	local bottom = -VOXEL_SIZE * GROUND_LAYERS
 	local region =
-		Region3.new(Vector3.new(-corner, -VOXEL_SIZE * 2, -corner), Vector3.new(corner, 0, corner))
-	-- WriteVoxels takes arrays indexed by x, then y, then z.
+		Region3.new(Vector3.new(-corner, bottom, -corner), Vector3.new(corner, 0, corner))
+	-- Channels are arrays indexed by x, then y, then z.
 	local materials = table.create(cellsPerSide)
-	local occupancies = table.create(cellsPerSide)
+	local solids = table.create(cellsPerSide)
+	local liquids = table.create(cellsPerSide)
 	for xIndex = 1, cellsPerSide do
 		local x = -corner + (xIndex - 0.5) * VOXEL_SIZE
-		local materialRow = table.create(cellsPerSide)
-		for zIndex = 1, cellsPerSide do
-			materialRow[zIndex] = pickMaterial(x, -corner + (zIndex - 0.5) * VOXEL_SIZE)
+		local materialLayers = table.create(GROUND_LAYERS)
+		local solidLayers = table.create(GROUND_LAYERS)
+		local liquidLayers = table.create(GROUND_LAYERS)
+		for yIndex = 1, GROUND_LAYERS do
+			materialLayers[yIndex] = table.create(cellsPerSide)
+			solidLayers[yIndex] = table.create(cellsPerSide)
+			liquidLayers[yIndex] = table.create(cellsPerSide)
 		end
-		materials[xIndex] = { materialRow, materialRow }
-		-- Terrain draws a cell's surface half a cell above where its fill
-		-- ends, so a full cell under a half-full one puts it at zero.
-		occupancies[xIndex] = {
-			table.create(cellsPerSide, 1),
-			table.create(cellsPerSide, 0.5),
-		}
+		for zIndex = 1, cellsPerSide do
+			local material, height = pickGround(x, -corner + (zIndex - 0.5) * VOXEL_SIZE)
+			for yIndex = 1, GROUND_LAYERS do
+				local cellBottom = bottom + (yIndex - 1) * VOXEL_SIZE
+				-- Measured in Studio: a cell filled by a share, over full
+				-- cells, puts the solid surface that share of a cell above
+				-- the cell's center, but water's surface that share above
+				-- the cell's bottom.
+				local solid = math.clamp((height - cellBottom - VOXEL_SIZE / 2) / VOXEL_SIZE, 0, 1)
+				-- Water also fills the shore's columns, a little above the
+				-- waterline, so terrain clips it against the slope instead of
+				-- ending it in 4-stud steps.
+				local water = if height < waterLevel + VOXEL_SIZE / 2
+					then math.clamp((waterLevel - cellBottom) / VOXEL_SIZE, 0, 1)
+					else 0
+				materialLayers[yIndex][zIndex] = if solid > 0 then material else Enum.Material.Air
+				solidLayers[yIndex][zIndex] = solid
+				liquidLayers[yIndex][zIndex] = math.min(water, 1 - solid)
+			end
+		end
+		materials[xIndex] = materialLayers
+		solids[xIndex] = solidLayers
+		liquids[xIndex] = liquidLayers
 	end
-	workspace.Terrain:WriteVoxels(region, VOXEL_SIZE, materials, occupancies)
+	workspace.Terrain:WriteVoxelChannels(region, VOXEL_SIZE, {
+		SolidMaterial = materials,
+		SolidOccupancy = solids,
+		LiquidOccupancy = liquids,
+	})
 end
 
 function Module:DrawDisc(
@@ -107,7 +146,7 @@ function Module:DrawDisc(
 	local disc = createPart(color, options)
 	disc.Shape = Enum.PartType.Cylinder
 	disc.Size = Vector3.new(FLAT_THICKNESS, radius * 2, radius * 2)
-	disc.CFrame = CFrame.new(center.X, getLayerCenterY(layer), center.Z)
+	disc.CFrame = CFrame.new(center.X, getLayerCenterY(layer, options), center.Z)
 		* CFrame.Angles(0, 0, math.pi / 2)
 	disc.Parent = getFolder()
 end
@@ -121,7 +160,7 @@ function Module:DrawSquare(
 )
 	local square = createPart(color, options)
 	square.Size = Vector3.new(size, FLAT_THICKNESS, size)
-	square.CFrame = CFrame.new(center.X, getLayerCenterY(layer), center.Z)
+	square.CFrame = CFrame.new(center.X, getLayerCenterY(layer, options), center.Z)
 	square.Parent = getFolder()
 end
 
@@ -136,7 +175,7 @@ function Module:DrawLine(
 	layer: number,
 	options: SurfaceOptions?
 )
-	local y = getLayerCenterY(layer)
+	local y = getLayerCenterY(layer, options)
 	local start = Vector3.new(from.X, y, from.Z)
 	local finish = Vector3.new(to.X, y, to.Z)
 	local length = (finish - start).Magnitude
@@ -184,7 +223,7 @@ function Module:DrawRing(
 	local count = math.max(math.ceil(2 * math.pi * radius / RING_SEGMENT_LENGTH), MIN_RING_SEGMENTS)
 	-- Sized to the band's outer edge, so neighboring pieces leave no gaps.
 	local length = 2 * (radius + width / 2) * math.tan(math.pi / count)
-	local origin = CFrame.new(center.X, getLayerCenterY(layer), center.Z)
+	local origin = CFrame.new(center.X, getLayerCenterY(layer, options), center.Z)
 	for index = 1, count do
 		local segment = createPart(color, options)
 		segment.Size = Vector3.new(length, FLAT_THICKNESS, width)
@@ -260,6 +299,36 @@ function Module:DrawProp(cframe: CFrame, size: Vector3, color: Color3, options: 
 		prop.CFrame = cframe
 	end
 	prop.Parent = getFolder()
+end
+
+--[[
+	Puffs white spray up from a square patch, such as the foam where a
+	waterfall lands.
+]]
+function Module:DrawSpray(center: Vector3, size: number)
+	local patch = createPart(Color3.new(1, 1, 1), { Transparency = 1 })
+	patch.Size = Vector3.new(size, 0.2, size)
+	patch.CFrame = CFrame.new(center)
+
+	local spray = Instance.new("ParticleEmitter")
+	spray.Texture = SPRAY_TEXTURE
+	spray.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, size * 0.25),
+		NumberSequenceKeypoint.new(1, size * 0.8),
+	})
+	spray.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.4),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	spray.Lifetime = NumberRange.new(1.2, 2.2)
+	spray.Rate = 30
+	spray.Speed = NumberRange.new(3, 7)
+	spray.SpreadAngle = Vector2.new(60, 60)
+	spray.Acceleration = Vector3.new(0, -3, 0)
+	spray.Rotation = NumberRange.new(0, 360)
+	spray.RotSpeed = NumberRange.new(-30, 30)
+	spray.Parent = patch
+	patch.Parent = getFolder()
 end
 
 return Module

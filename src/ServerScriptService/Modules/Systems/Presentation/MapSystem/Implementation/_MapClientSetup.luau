@@ -1,5 +1,6 @@
 --!strict
 
+const MapGround = require("@game/ServerScriptService/Modules/Data/MapGround")
 const MapLayout = require("@game/ServerScriptService/Modules/Data/MapLayout")
 
 const MapClientService = require("../SystemPackage/MapClientService")
@@ -20,6 +21,8 @@ const TERRAIN_COLORS: { [Enum.Material]: Color3 } = {
 	[Enum.Material.Rock] = Color3.fromRGB(112, 108, 98),
 	[Enum.Material.Basalt] = Color3.fromRGB(46, 62, 40),
 	[Enum.Material.Slate] = Color3.fromRGB(86, 90, 80),
+	-- Blue-gray boulders and the waterfall's cliff, along the river.
+	[Enum.Material.Limestone] = Color3.fromRGB(92, 94, 104),
 }
 const LANE_COLOR = Color3.fromRGB(168, 132, 88)
 const BLUE_SIDE_COLOR = Color3.fromRGB(90, 160, 255)
@@ -28,11 +31,14 @@ const SIDE_COLORS: { [MapLayout.MapTeam]: Color3 } = {
 	Blue = BLUE_SIDE_COLOR,
 	Red = RED_SIDE_COLOR,
 }
-const RIVER_BED_COLOR = Color3.fromRGB(26, 64, 92)
-const RIVER_ENERGY_COLOR = Color3.fromRGB(70, 150, 220)
-const RIVER_BANK_COLOR = Color3.fromRGB(190, 230, 255)
--- The water's surface lets a little of the dark bed through.
-const RIVER_ENERGY_TRANSPARENCY = 0.25
+-- A slate blue-green that lets the bed show through near the banks.
+const WATER_COLOR = Color3.fromRGB(44, 84, 98)
+const WATER_TRANSPARENCY = 0.45
+const WATER_REFLECTANCE = 0.4
+const WATER_WAVE_SIZE = 0.1
+const WATER_WAVE_SPEED = 10
+const FALL_COLOR = Color3.fromRGB(205, 228, 236)
+const FALL_STREAK_COLOR = Color3.fromRGB(245, 250, 252)
 const RING_FLOOR_COLOR = Color3.fromRGB(96, 98, 86)
 const RING_COLOR = Color3.fromRGB(255, 210, 110)
 const BASE_COLORS: { [MapLayout.MapTeam]: Color3 } = {
@@ -75,8 +81,6 @@ const RUNE_COLOR = Color3.fromRGB(120, 200, 255)
 
 -- Every client builds the same scenery from the same seed.
 const SCENERY_SEED = 7331
--- Red's routes are Blue's run backward, so drawing Blue's covers every lane.
-const DRAWN_ROUTES_TEAM: MapLayout.MapTeam = "Blue"
 
 -- Studs of ground drawn past the playable square's edge.
 const OUTSIDE_MARGIN = 140
@@ -87,17 +91,47 @@ const JUNGLE_RIVER_GAP = 6
 -- Studs the brush floor reaches past the patch's edge.
 const BRUSH_FLOOR_MARGIN = 1
 const LANE_EDGE_WIDTH = 0.5
-const RIVER_BANK_WIDTH = 0.6
 const BASE_EDGE_WIDTH = 0.8
 const BASE_INNER_INSET = 8
--- Radii in studs, by camp kind.
-const CAMP_RADII: { [MapLayout.CampKind]: number } = {
-	Small = 6,
-	CrystalGolem = 9,
-	EmberBeetle = 9,
-	Skyray = 18,
-	HiveQueen = 26,
-}
+-- Ground this close above the water's surface is drawn as the muddy bed.
+const BED_MARGIN = 0.5
+-- Outside the arena the river runs through meadow this many studs past its
+-- banks, and scenery keeps this far clear of them.
+const OUTSIDE_MEADOW_REACH = 10
+const OUTSIDE_RIVER_CLEARANCE = 20
+-- Boulders sit about this far from the river's course line, near where its
+-- bank meets the water, one per this many studs of the course.
+const WATERLINE_REACH = 12
+const ROCK_SPACING = 9
+const ARENA_ROCK_MIN_RADIUS = 1.2
+const ARENA_ROCK_MAX_RADIUS = 2.2
+const OUTSIDE_ROCK_MIN_RADIUS = 2
+const OUTSIDE_ROCK_MAX_RADIUS = 4.5
+-- The big boulder on the grassy point inside the river's last bend.
+const BEND_BOULDER = Vector3.new(372, 0, 305)
+const BEND_BOULDER_RADIUS = 7
+-- Bridges are stone walls along a road's edges wherever the ground beside
+-- it drops more than BRIDGE_DEPTH, sampled every BRIDGE_STEP studs.
+const BRIDGE_WALL_THICKNESS = 1.6
+const BRIDGE_WALL_HEIGHT = 0.9
+const BRIDGE_DEPTH = 0.6
+const BRIDGE_STEP = 2
+-- Platforms sink below the river's bed, and their stone lip shows this many
+-- studs past the floor drawn on top.
+const PLATFORM_FOOTING = 2
+const PLATFORM_LIP = 0.6
+-- A platform's top sits this far below zero, under the bottom of the
+-- lowest flat shape drawn on it.
+const PLATFORM_TOP_GAP = 0.15
+-- The cliff the river falls from. The fall stands this far behind its foot,
+-- the start of the river's course.
+const FALL_SETBACK = 6
+const FALL_WIDTH = 14
+const FALL_STREAKS = 6
+const CLIFF_HEIGHT = 34
+const CLIFF_WIDTH = 84
+const CLIFF_DEPTH = 34
+const CLIFF_BOULDERS = 16
 const CAMP_RING_WIDTH = 0.5
 const PAD_RADIUS = 4
 const LANDING_RADIUS = 3
@@ -125,11 +159,8 @@ const BLADES_PER_STUD = 1.1
 const BASE_BLADES = 14
 const BULBS_PER_BRUSH = 3
 
--- Draw order, bottom to top. Lanes bridge the river and run on into the
--- bases, under the bases' borders.
-const RIVER_LAYER = 1
-const RIVER_ENERGY_LAYER = 1.3
-const RIVER_BANK_LAYER = 1.6
+-- Draw order, bottom to top. Lanes run on into the bases, under the bases'
+-- borders.
 const RING_FLOOR_LAYER = 2
 const BASE_LAYER = 2.2
 const LANE_LAYER = 3
@@ -251,29 +282,6 @@ local function drawPathEdges(points: { Vector3 }, width: number, color: Color3)
 	end
 end
 
-local function findCore(team: MapLayout.MapTeam): Vector3?
-	for _, spot in MapLayout.Structures do
-		if spot.Team == team and spot.Tier == "Core" then
-			return spot.Position
-		end
-	end
-	return nil
-end
-
--- Routes start beside their core, so each road is drawn on into it.
-local function getRoads(): { { Vector3 } }
-	local core = findCore(DRAWN_ROUTES_TEAM)
-	local roads = {}
-	for _, route in MapLayout.Routes[DRAWN_ROUTES_TEAM] do
-		local road = table.clone(route)
-		if core then
-			table.insert(road, 1, core)
-		end
-		table.insert(roads, road)
-	end
-	return roads
-end
-
 local function toSegments(points: { Vector3 }, segments: { Segment })
 	for index = 1, #points - 1 do
 		local from = points[index]
@@ -313,13 +321,14 @@ local function isInsideBase(x: number, z: number): boolean
 end
 
 --[[
-	Returns the function that picks the ground's material at each spot:
-	violet dust along the lanes, dark soil and moss in the jungle, teal
-	ground under brush, and dark rock past the arena's edge.
+	Returns the function that picks the ground's material and height at each
+	spot: meadow along the lanes and the river, mud under the water, dark
+	soil and moss in the jungle, grass under brush, and dark rock past the
+	arena's edge.
 ]]
-local function createGroundPicker(): (x: number, z: number) -> Enum.Material
+local function createGroundPicker(): (x: number, z: number) -> (Enum.Material, number)
 	local laneSegments: { Segment } = {}
-	for _, road in getRoads() do
+	for _, road in MapGround.Roads do
 		toSegments(road, laneSegments)
 	end
 	local riverSegments: { Segment } = {}
@@ -334,29 +343,40 @@ local function createGroundPicker(): (x: number, z: number) -> Enum.Material
 	local half = MapLayout.HalfSize
 	local laneReach = MapLayout.LaneWidth / 2 + JUNGLE_LANE_GAP
 	local riverReach = MapLayout.RiverWidth / 2 + JUNGLE_RIVER_GAP
-	return function(x: number, z: number): Enum.Material
+	local meadowReach = MapGround.BankReach + OUTSIDE_MEADOW_REACH
+	local function pickMaterial(x: number, z: number): Enum.Material
 		if math.abs(x) > half or math.abs(z) > half then
-			return if math.noise(x / 46, z / 46, 0.37) > 0.12
-				then Enum.Material.Slate
-				else Enum.Material.Basalt
-		end
-		for index, segment in brushSegments do
-			if getSegmentDistance(x, z, segment) <= brushRadii[index] then
-				return Enum.Material.Grass
+			if MapGround.getCourseDistance(x, z) > meadowReach then
+				return if math.noise(x / 46, z / 46, 0.37) > 0.12
+					then Enum.Material.Slate
+					else Enum.Material.Basalt
 			end
-		end
-
-		local isJungle = getNearestDistance(x, z, laneSegments) > laneReach
-			and getNearestDistance(x, z, riverSegments) > riverReach
-			and not isInsideBase(x, z)
-		if isJungle then
-			return if math.noise(x / 26, z / 26, 0.71) > 0.28
-				then Enum.Material.LeafyGrass
-				else Enum.Material.Mud
+		else
+			for index, segment in brushSegments do
+				if getSegmentDistance(x, z, segment) <= brushRadii[index] then
+					return Enum.Material.Grass
+				end
+			end
+			local isJungle = getNearestDistance(x, z, laneSegments) > laneReach
+				and getNearestDistance(x, z, riverSegments) > riverReach
+				and not isInsideBase(x, z)
+			if isJungle then
+				return if math.noise(x / 26, z / 26, 0.71) > 0.28
+					then Enum.Material.LeafyGrass
+					else Enum.Material.Mud
+			end
 		end
 		return if math.noise(x / 50, z / 50, 0.13) > 0.15
 			then Enum.Material.Sand
 			else Enum.Material.Ground
+	end
+
+	return function(x: number, z: number): (Enum.Material, number)
+		local height = MapGround.getGroundHeight(x, z)
+		if height < MapGround.WaterLevel + BED_MARGIN then
+			return Enum.Material.Mud, height
+		end
+		return pickMaterial(x, z), height
 	end
 end
 
@@ -365,32 +385,218 @@ local function drawGround()
 	for material, color in TERRAIN_COLORS do
 		terrain:SetMaterialColor(material, color)
 	end
-	MapClientService:PaintGround(MapLayout.HalfSize + OUTSIDE_MARGIN, createGroundPicker())
+	terrain.WaterColor = WATER_COLOR
+	terrain.WaterTransparency = WATER_TRANSPARENCY
+	terrain.WaterReflectance = WATER_REFLECTANCE
+	terrain.WaterWaveSize = WATER_WAVE_SIZE
+	terrain.WaterWaveSpeed = WATER_WAVE_SPEED
+	MapClientService:PaintGround(
+		MapLayout.HalfSize + OUTSIDE_MARGIN,
+		createGroundPicker(),
+		MapGround.WaterLevel
+	)
+end
+
+--[[
+	Rounded blue-gray boulders along the river's waterline: small ones inside
+	the arena, where units walk past them, and bigger ones outside it.
+]]
+local function drawRiverRocks()
+	local terrain = workspace.Terrain
+	local half = MapLayout.HalfSize
+	local course = MapGround.Course
+	for index = 1, #course - 1 do
+		local from = course[index]
+		local to = course[index + 1]
+		local side = getNormal(from, to)
+		local count = math.floor((to - from).Magnitude / ROCK_SPACING + random:NextNumber())
+		for _ = 1, count do
+			local along = from:Lerp(to, random:NextNumber())
+			local isOutside = math.abs(along.X) > half or math.abs(along.Z) > half
+			local radius = if isOutside
+				then random:NextNumber(OUTSIDE_ROCK_MIN_RADIUS, OUTSIDE_ROCK_MAX_RADIUS)
+				else random:NextNumber(ARENA_ROCK_MIN_RADIUS, ARENA_ROCK_MAX_RADIUS)
+			local sign = if random:NextNumber() < 0.5 then 1 else -1
+			local spot = along + side * sign * (WATERLINE_REACH + random:NextNumber(-3, 2))
+			local isClear = MapGround.getRoadDistance(spot.X, spot.Z)
+					> MapLayout.LaneWidth / 2 + radius + 1
+				and MapGround.getPlatformGap(spot.X, spot.Z) > radius + 1
+			if isClear then
+				local sink = radius * random:NextNumber(0.2, 0.5)
+				terrain:FillBall(
+					spot + Vector3.new(0, MapGround.WaterLevel - sink, 0),
+					radius,
+					Enum.Material.Limestone
+				)
+			end
+		end
+	end
+
+	terrain:FillBall(BEND_BOULDER, BEND_BOULDER_RADIUS, Enum.Material.Limestone)
+	for _ = 1, 3 do
+		local offset = Vector3.new(random:NextNumber(-1, 1), 0, random:NextNumber(-1, 1)).Unit
+		local radius = BEND_BOULDER_RADIUS * random:NextNumber(0.4, 0.6)
+		terrain:FillBall(
+			BEND_BOULDER + offset * BEND_BOULDER_RADIUS - Vector3.new(0, radius * 0.4, 0),
+			radius,
+			Enum.Material.Limestone
+		)
+	end
+end
+
+local function drawBridgeWall(from: Vector3, to: Vector3)
+	local direction = (to - from).Unit
+	local start = from - direction * BRIDGE_STEP / 2
+	local finish = to + direction * BRIDGE_STEP / 2
+	local bottom = MapGround.BedHeight - 1
+	local height = BRIDGE_WALL_HEIGHT - bottom
+	local lift = Vector3.new(0, bottom + height / 2, 0)
+	MapClientService:DrawProp(
+		CFrame.lookAt((start + finish) / 2 + lift, finish + lift),
+		Vector3.new(BRIDGE_WALL_THICKNESS, height, (finish - start).Magnitude),
+		RUIN_COLOR,
+		{ Material = Enum.Material.Cobblestone, CastsShadow = true }
+	)
+end
+
+--[[
+	Roads cross the river on causeways. Stone walls line each causeway's
+	sides, so it reads as a bridge over the water.
+]]
+local function drawBridges()
+	local offset = MapLayout.LaneWidth / 2 + BRIDGE_WALL_THICKNESS / 2
+	for _, road in MapGround.Roads do
+		for index = 1, #road - 1 do
+			local from = road[index]
+			local to = road[index + 1]
+			local steps = math.ceil((to - from).Magnitude / BRIDGE_STEP)
+			for _, sign in { 1, -1 } do
+				local shift = getNormal(from, to) * sign * offset
+				local runStart: Vector3? = nil
+				local last = from + shift
+				for step = 0, steps do
+					local spot = from:Lerp(to, step / steps) + shift
+					-- Where roads meet, a wall would cut across the other road.
+					local isWalled = MapGround.getRiverHeight(spot.X, spot.Z) < -BRIDGE_DEPTH
+						and MapGround.getPlatformGap(spot.X, spot.Z) > 0
+						and MapGround.getRoadDistance(spot.X, spot.Z) >= MapLayout.LaneWidth / 2
+					if isWalled and not runStart then
+						runStart = spot
+					elseif runStart and not isWalled then
+						drawBridgeWall(runStart, last)
+						runStart = nil
+					end
+					last = spot
+				end
+				if runStart then
+					drawBridgeWall(runStart, last)
+				end
+			end
+		end
+	end
+end
+
+--[[
+	The crash ring and the river bosses' pits stand on round stone platforms
+	rising out of the river.
+]]
+local function drawPlatforms()
+	local depth = -MapGround.BedHeight + PLATFORM_FOOTING
+	for _, platform in MapGround.Platforms do
+		local diameter = (platform.Radius + PLATFORM_LIP) * 2
+		MapClientService:DrawProp(
+			CFrame.new(platform.Center - Vector3.new(0, depth / 2 + PLATFORM_TOP_GAP, 0)),
+			Vector3.new(diameter, depth, diameter),
+			RUIN_COLOR,
+			{ Shape = "Cylinder", Material = Enum.Material.Cobblestone, CastsShadow = true }
+		)
+	end
+end
+
+--[[
+	The river's source: a waterfall pouring from a notch in a stone cliff,
+	with spray where it lands.
+]]
+local function drawWaterfall()
+	local terrain = workspace.Terrain
+	local foot = MapGround.Course[1]
+	local away = foot - MapGround.Course[2]
+	local back = Vector3.new(away.X, 0, away.Z).Unit
+	-- Faces into the cliff, so local -Z runs into the rock and +Z out over
+	-- the river.
+	local face = CFrame.lookAt(foot + back * FALL_SETBACK, foot + back * (FALL_SETBACK + 1))
+
+	terrain:FillBlock(
+		face * CFrame.new(0, CLIFF_HEIGHT / 2 - 4, -CLIFF_DEPTH / 2),
+		Vector3.new(CLIFF_WIDTH, CLIFF_HEIGHT + 8, CLIFF_DEPTH),
+		Enum.Material.Limestone
+	)
+	for _ = 1, CLIFF_BOULDERS do
+		local radius = random:NextNumber(8, 14)
+		local lateral = random:NextNumber(-CLIFF_WIDTH / 2, CLIFF_WIDTH / 2)
+		-- Boulders bulge out of the face, but never over the fall.
+		local depth = if math.abs(lateral) < FALL_WIDTH / 2 + radius
+			then -radius - 2
+			else -radius * 0.6
+		local height = random:NextNumber(0, CLIFF_HEIGHT)
+		terrain:FillBall(
+			(face * CFrame.new(lateral, height, depth)).Position,
+			radius,
+			Enum.Material.Limestone
+		)
+	end
+	-- The notch stops short of the cliff's back, so no sky shows through it,
+	-- and holds the pool that spills over the edge.
+	local notchBack = -CLIFF_DEPTH * 0.7
+	terrain:FillBlock(
+		face * CFrame.new(0, CLIFF_HEIGHT + 2, (notchBack + 6) / 2),
+		Vector3.new(FALL_WIDTH, 8, 6 - notchBack),
+		Enum.Material.Air
+	)
+	terrain:FillBlock(
+		face * CFrame.new(0, CLIFF_HEIGHT, (notchBack - 2) / 2),
+		Vector3.new(FALL_WIDTH, 4, -2 - notchBack),
+		Enum.Material.Water
+	)
+
+	local top = CLIFF_HEIGHT + 1
+	local bottom = MapGround.WaterLevel
+	-- Terrain rounds the face out to its 4-stud cells, so a recess behind
+	-- the fall keeps the rock from swallowing it.
+	terrain:FillBlock(
+		face * CFrame.new(0, (CLIFF_HEIGHT + bottom) / 2, 1.5),
+		Vector3.new(FALL_WIDTH, CLIFF_HEIGHT - bottom, 9),
+		Enum.Material.Air
+	)
+	MapClientService:DrawProp(
+		face * CFrame.new(0, (top + bottom) / 2, 1),
+		Vector3.new(FALL_WIDTH - 2, top - bottom, 1.2),
+		FALL_COLOR,
+		{ Transparency = 0.2 }
+	)
+	for _ = 1, FALL_STREAKS do
+		local length = random:NextNumber(0.4, 1) * (top - bottom)
+		MapClientService:DrawProp(
+			face
+				* CFrame.new(
+					random:NextNumber(-FALL_WIDTH / 2 + 2, FALL_WIDTH / 2 - 2),
+					top - length / 2,
+					1.8
+				),
+			Vector3.new(random:NextNumber(0.8, 2), length, 0.3),
+			FALL_STREAK_COLOR,
+			{ Transparency = 0.45 }
+		)
+	end
+	MapClientService:DrawSpray((face * CFrame.new(0, bottom, 4)).Position, FALL_WIDTH)
+	MapClientService:DrawSpray((face * CFrame.new(0, bottom, 9)).Position, FALL_WIDTH * 0.6)
 end
 
 local function drawRiver()
-	local width = MapLayout.RiverWidth
-	MapClientService:DrawPath(MapLayout.River, width, RIVER_BED_COLOR, RIVER_LAYER)
-	-- Glass, not ForceField: a force field's shimmer fades in and out, and a
-	-- river that comes and goes reads as broken.
-	MapClientService:DrawPath(MapLayout.River, width - 4, RIVER_ENERGY_COLOR, RIVER_ENERGY_LAYER, {
-		Material = Enum.Material.Glass,
-		Transparency = RIVER_ENERGY_TRANSPARENCY,
-	})
-
-	local from = MapLayout.River[1]
-	local to = MapLayout.River[#MapLayout.River]
-	local side = Vector3.new(-(to - from).Z, 0, (to - from).X).Unit * width / 2
-	for _, offset in { side, -side } do
-		MapClientService:DrawLine(
-			from + offset,
-			to + offset,
-			RIVER_BANK_WIDTH,
-			RIVER_BANK_COLOR,
-			RIVER_BANK_LAYER,
-			NEON
-		)
-	end
+	drawRiverRocks()
+	drawBridges()
+	drawPlatforms()
+	drawWaterfall()
 end
 
 local function drawCrashRing()
@@ -408,7 +614,7 @@ local function drawCrashRing()
 end
 
 local function drawLanes()
-	for _, road in getRoads() do
+	for _, road in MapGround.Roads do
 		MapClientService:DrawPath(road, MapLayout.LaneWidth, LANE_COLOR, LANE_LAYER, {
 			Material = Enum.Material.Slate,
 		})
@@ -473,7 +679,7 @@ end
 
 local function drawCamps()
 	for _, camp in MapLayout.Camps do
-		local radius = CAMP_RADII[camp.Kind]
+		local radius = MapLayout.CampRadii[camp.Kind]
 		local color = CAMP_COLORS[camp.Kind]
 		MapClientService:DrawDisc(camp.Position, radius, PAD_FLOOR_COLOR, DETAIL_LAYER)
 		MapClientService:DrawRing(
@@ -515,6 +721,8 @@ local function drawLaunchPads()
 			DETAIL_RING_LAYER,
 			NEON
 		)
+		-- A landing in the river floats on the water.
+		local landingGround = MapGround.getGroundHeight(pad.Landing.X, pad.Landing.Z)
 		MapClientService:DrawRing(
 			pad.Landing,
 			LANDING_RADIUS,
@@ -524,6 +732,7 @@ local function drawLaunchPads()
 			{
 				Material = Enum.Material.Neon,
 				Transparency = 0.4,
+				Elevation = math.max(landingGround, MapGround.WaterLevel),
 			}
 		)
 		MapClientService:DrawLine(pad.Position, pad.Landing, 0.4, LAUNCH_COLOR, DETAIL_RING_LAYER, {
@@ -700,11 +909,11 @@ local function drawMushroom(base: Vector3, scale: number)
 	)
 end
 
---[[
-	Returns a random spot past the arena's edge, between the ridge and the
-	edge of the drawn ground.
-]]
-local function pickOutsideSpot(): Vector3
+local function isNearRiver(spot: Vector3, clearance: number): boolean
+	return MapGround.getCourseDistance(spot.X, spot.Z) < MapGround.BankReach + clearance
+end
+
+local function pickAnyOutsideSpot(): Vector3
 	local half = MapLayout.HalfSize
 	local reach = random:NextNumber(half + RIDGE_OFFSET + 14, half + OUTSIDE_MARGIN - 10)
 	local across = random:NextNumber(-half - OUTSIDE_MARGIN + 10, half + OUTSIDE_MARGIN - 10)
@@ -718,6 +927,18 @@ local function pickOutsideSpot(): Vector3
 	else
 		return Vector3.new(reach, 0, across)
 	end
+end
+
+--[[
+	Returns a random spot past the arena's edge, between the ridge and the
+	edge of the drawn ground, clear of the river.
+]]
+local function pickOutsideSpot(): Vector3
+	local spot
+	repeat
+		spot = pickAnyOutsideSpot()
+	until not isNearRiver(spot, OUTSIDE_RIVER_CLEARANCE)
+	return spot
 end
 
 --[[
@@ -739,7 +960,10 @@ local function drawRidge()
 		do
 			local radius = random:NextNumber(RIDGE_MIN_RADIUS, RIDGE_MAX_RADIUS)
 			local sink = random:NextNumber(0, radius * 0.45)
-			terrain:FillBall(center - Vector3.new(0, sink, 0), radius, Enum.Material.Rock)
+			-- The river leaves the arena through a gap in the ridge.
+			if not isNearRiver(center, radius) then
+				terrain:FillBall(center - Vector3.new(0, sink, 0), radius, Enum.Material.Rock)
+			end
 		end
 	end
 	for _ = 1, RIDGE_TREE_COUNT do
@@ -747,7 +971,9 @@ local function drawRidge()
 		local spot = if random:NextNumber() < 0.5
 			then Vector3.new(along, 4, reach * (if random:NextNumber() < 0.5 then 1 else -1))
 			else Vector3.new(reach * (if random:NextNumber() < 0.5 then 1 else -1), 4, along)
-		drawTree(spot, random:NextNumber(1.3, 1.9))
+		if not isNearRiver(spot, RIDGE_MAX_RADIUS) then
+			drawTree(spot, random:NextNumber(1.3, 1.9))
+		end
 	end
 end
 
