@@ -37,6 +37,8 @@ const ENLARGED_SCALE = 1.6
 const BOB_SPEED = 3
 const SHOT_SIZE = 0.8
 const SHOT_HEIGHT = 2.5
+-- Long along Z, the way CFrame.lookAt points it.
+const ARROW_SIZE = Vector3.new(0.15, 0.15, 1.8)
 const PICK_DISTANCE = 1000
 -- Studs of slack around a unit when a click lands on the ground near it, so
 -- small aliens are easy to target.
@@ -75,6 +77,8 @@ export type VisualShape = "Ball" | "Block" | "Cylinder"
 -- built from the spec's Rig, inside an unseen box of the spec's size that
 -- clicks land on. The others add detail around the shape, sized from it.
 export type VisualStyle = "Plain" | "Rig" | "Alien" | "Tower" | "Gate" | "Core" | "Beast"
+-- Keep in sync with ProjectileStyle in UnitCatalog.
+export type ProjectileStyle = "Orb" | "Arrow"
 
 export type VisualSpec = {
 	Shape: VisualShape,
@@ -89,6 +93,11 @@ export type VisualSpec = {
 	Bob: number?,
 	-- Studs per second of the unit's attack shots. Nil for melee units.
 	ProjectileSpeed: number?,
+	-- Orb when nil.
+	ProjectileStyle: ProjectileStyle?,
+	-- Recolors a Rig style unit's top in its team's color, for figures that
+	-- share one look across teams, like minions.
+	IsTeamDressed: boolean?,
 	-- Of every part. Zero when nil.
 	Transparency: number?,
 	-- Hides the health bar, for units that can never be hit, like a clone.
@@ -124,6 +133,7 @@ type Visual = {
 
 type Shot = {
 	Part: BasePart,
+	Style: ProjectileStyle,
 	Position: Vector3,
 	TargetId: number,
 	Speed: number,
@@ -144,7 +154,10 @@ local teamColors: { [Team]: Color3 } = {
 }
 local visuals: { [number]: Visual? } = {}
 local shots: { Shot } = {}
-local spareShotParts: { BasePart } = {}
+local spareShotParts: { [ProjectileStyle]: { BasePart } } = {
+	Orb = {},
+	Arrow = {},
+}
 local folder: Folder? = nil
 local movedParts: { BasePart } = {}
 local movedCFrames: { CFrame } = {}
@@ -513,6 +526,10 @@ local function addVisual(unit: ClientUnit)
 	end
 
 	local rigSpec = spec.Rig
+	if rigSpec and spec.IsTeamDressed then
+		rigSpec = table.clone(rigSpec)
+		rigSpec.TopColor = teamColor
+	end
 	local rig = if style == "Rig" and rigSpec
 		then CharacterRig.build(rigSpec, transparency, scale)
 		else nil
@@ -583,10 +600,15 @@ local function isGone(unit: ClientUnit): boolean
 	return unit.IsDead or unit.IsHidden
 end
 
-local function createShotPart(): BasePart
+local function createShotPart(style: ProjectileStyle): BasePart
 	local part = Instance.new("Part")
-	part.Shape = Enum.PartType.Ball
-	part.Size = Vector3.new(SHOT_SIZE, SHOT_SIZE, SHOT_SIZE)
+	if style == "Arrow" then
+		part.Shape = Enum.PartType.Block
+		part.Size = ARROW_SIZE
+	else
+		part.Shape = Enum.PartType.Ball
+		part.Size = Vector3.new(SHOT_SIZE, SHOT_SIZE, SHOT_SIZE)
+	end
 	part.Material = Enum.Material.Neon
 	part.Anchored = true
 	part.CanCollide = false
@@ -688,13 +710,16 @@ local function onAttackFired(attacker: ClientUnit, target: ClientUnit)
 
 	local origin = UnitClientService:GetRenderPose(attacker, UnitClientService:GetRenderTime())
 	local position = origin + Vector3.new(0, SHOT_HEIGHT, 0)
-	local part = table.remove(spareShotParts) or createShotPart()
+	-- Annotated because luau-lsp widens the "Orb" default to string.
+	local style: ProjectileStyle = spec and spec.ProjectileStyle or "Orb"
+	local part = table.remove(spareShotParts[style]) or createShotPart(style)
 	part.Color = teamColors[attacker.Team]
 	part.CFrame = CFrame.new(position)
 	part.Parent = visualFolder
 
 	table.insert(shots, {
 		Part = part,
+		Style = style,
 		Position = position,
 		TargetId = target.Id,
 		Speed = speed,
@@ -713,8 +738,10 @@ local function stepShots(deltaTime: number, renderTime: number)
 			local distance = offset.Magnitude
 			local stepLength = shot.Speed * deltaTime
 			if distance > stepLength then
-				shot.Position += offset / distance * stepLength
-				shot.Part.CFrame = CFrame.new(shot.Position)
+				local direction = offset / distance
+				shot.Position += direction * stepLength
+				-- An arrow points where it flies; an orb looks the same any way.
+				shot.Part.CFrame = CFrame.lookAt(shot.Position, shot.Position + direction)
 				isFinished = false
 			else
 				spawnImpact(targetPosition + Vector3.new(0, SHOT_HEIGHT, 0), shot.Part.Color)
@@ -723,7 +750,7 @@ local function stepShots(deltaTime: number, renderTime: number)
 
 		if isFinished then
 			shot.Part.Parent = nil
-			table.insert(spareShotParts, shot.Part)
+			table.insert(spareShotParts[shot.Style], shot.Part)
 			shots[index] = shots[#shots]
 			shots[#shots] = nil
 		end

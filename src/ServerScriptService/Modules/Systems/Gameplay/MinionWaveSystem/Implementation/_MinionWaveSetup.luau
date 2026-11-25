@@ -15,6 +15,7 @@ function Module:Init()
 	MinionWaveServerService:SetSchedule(FIRST_WAVE_TIME, WAVE_INTERVAL)
 
 	MinionWaveServerService:RegisterMinionType("Melee", "Zib", UnitCatalog.Units.Zib.Stats)
+	MinionWaveServerService:RegisterMinionType("Archer", "Quill", UnitCatalog.Units.Quill.Stats)
 	MinionWaveServerService:RegisterMinionType("Caster", "Blip", UnitCatalog.Units.Blip.Stats)
 	MinionWaveServerService:RegisterMinionType(
 		"Siege",

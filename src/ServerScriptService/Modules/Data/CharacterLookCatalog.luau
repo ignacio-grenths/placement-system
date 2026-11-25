@@ -32,6 +32,17 @@ const GRIP_COLOR = Color3.fromRGB(35, 30, 30)
 const HAIR_CAP_SIZE = Vector3.new(1.68, 1.26, 1.61)
 const HAIR_CAP_OFFSET = CFrame.new(0, 0.31, 0.08)
 const BEND_LENGTH = 0.5
+-- Lane minions are small figures. Their tops are recolored to their team's
+-- color when drawn, so MINION_TOP is only a stand-in.
+const MINION_SCALE = 0.5
+const MINION_SKIN = Color3.fromRGB(240, 205, 175)
+const MINION_EYES = Color3.fromRGB(40, 30, 30)
+const MINION_TOP = Color3.fromRGB(150, 150, 150)
+const MINION_TROUSERS = Color3.fromRGB(78, 62, 48)
+const MINION_BOOTS = Color3.fromRGB(44, 34, 28)
+const LEATHER = Color3.fromRGB(110, 72, 44)
+const IRON = Color3.fromRGB(150, 156, 168)
+const BRASS = Color3.fromRGB(200, 160, 70)
 
 local Module = {}
 
@@ -1148,6 +1159,166 @@ local function shadowKnight(): RigSpec
 	}
 end
 
+-- A lane swordsman: an iron cap with a nose guard, a round shield, and a
+-- short sword.
+local function swordMinion(scale: number, build: number): RigSpec
+	local head: { PartPlan } = {
+		{
+			Shape = "Ellipsoid",
+			Size = Vector3.new(1.64, 1.02, 1.58),
+			Offset = CFrame.new(0, 0.4, 0.04),
+			Color = IRON,
+			Material = Enum.Material.Metal,
+		},
+		{
+			Shape = "Block",
+			Size = Vector3.new(0.14, 0.5, 0.1),
+			Offset = CFrame.new(0, 0.05, -0.76),
+			Color = IRON,
+			Material = Enum.Material.Metal,
+		},
+	}
+	local shield: { PartPlan } = {
+		{
+			-- Turned so the disc faces out from the arm.
+			Shape = "Cylinder",
+			Size = Vector3.new(1.2, 0.12, 1.2),
+			Offset = CFrame.new(-0.34, -0.45, 0) * CFrame.Angles(0, 0, math.pi / 2),
+			Color = LEATHER,
+		},
+		{
+			Shape = "Ball",
+			Size = Vector3.one * 0.32,
+			Offset = CFrame.new(-0.42, -0.45, 0),
+			Color = BRASS,
+			Material = Enum.Material.Metal,
+		},
+	}
+	return {
+		Scale = scale,
+		Build = build,
+		SkinColor = MINION_SKIN,
+		HairColor = LEATHER,
+		EyeColor = MINION_EYES,
+		TopColor = MINION_TOP,
+		BottomColor = MINION_TROUSERS,
+		ShoeColor = MINION_BOOTS,
+		AttackMotion = "Slash",
+		Attachments = {
+			Head = head,
+			Torso = { belt(LEATHER) },
+			LeftArm = shield,
+			RightArm = handBlade({ Length = 1.7, GuardColor = BRASS, EdgeColor = STEEL }),
+		},
+	}
+end
+
+-- A lane archer: a pointed hood, a quiver on the back, and a tall bow held
+-- upright in the off hand, big enough to read from the camera above.
+local function archerMinion(): RigSpec
+	local wood = Color3.fromRGB(150, 100, 52)
+	local hood = Color3.fromRGB(70, 92, 56)
+	local fletching = Color3.fromRGB(235, 235, 225)
+	-- Out to the side, so the body doesn't hide it from the camera behind.
+	local grip = Vector3.new(-0.4, -0.95, -0.2)
+	local bow: { PartPlan } = {
+		{
+			Shape = "Block",
+			Size = Vector3.new(0.24, 0.36, 0.24),
+			Offset = CFrame.new(grip),
+			Color = LEATHER,
+		},
+		lock(wood, grip, Vector3.new(-0.4, 0.3, 0.2), 0.22),
+		lock(wood, grip, Vector3.new(-0.4, -2.2, 0.2), 0.22),
+		{
+			Shape = "Block",
+			Size = Vector3.new(0.05, 2.5, 0.05),
+			Offset = CFrame.new(-0.4, -0.95, 0.2),
+			Color = fletching,
+		},
+	}
+	local quiver: { PartPlan } = {
+		{
+			Shape = "Cylinder",
+			Size = Vector3.new(0.38, 1.3, 0.38),
+			Offset = CFrame.new(0.3, 0.2, 0.55) * CFrame.Angles(0, 0, -0.35),
+			Color = LEATHER,
+		},
+		{
+			Shape = "Block",
+			Size = Vector3.new(0.3, 0.3, 0.1),
+			Offset = CFrame.new(0.55, 0.95, 0.55) * CFrame.Angles(0, 0, -0.35),
+			Color = fletching,
+		},
+	}
+	return {
+		Scale = MINION_SCALE,
+		SkinColor = MINION_SKIN,
+		HairColor = hood,
+		EyeColor = MINION_EYES,
+		TopColor = MINION_TOP,
+		BottomColor = MINION_TROUSERS,
+		ShoeColor = MINION_BOOTS,
+		AttackMotion = "Shoot",
+		Attachments = {
+			Head = {
+				hairCap(hood),
+				lock(hood, Vector3.new(0, 0.6, 0.3), Vector3.new(0, 0.5, 1.05), 0.5),
+			},
+			Torso = join({ belt(LEATHER) }, quiver),
+			LeftArm = bow,
+		},
+	}
+end
+
+-- A lane mage: a tall pointed hat and a glowing orb in hand.
+local function mageMinion(): RigSpec
+	local hat = Color3.fromRGB(58, 44, 96)
+	local glow = Color3.fromRGB(70, 170, 255)
+	-- Stacked discs narrowing to a point, which reads as a cone.
+	local hatTiers: { PartPlan } = {}
+	for tier, width in { 1.3, 1, 0.7, 0.4 } do
+		table.insert(hatTiers, {
+			Shape = "Cylinder",
+			Size = Vector3.new(width, 0.42, width),
+			Offset = CFrame.new(0, 0.62 + tier * 0.38, 0.04 + tier * 0.06),
+			Color = hat,
+		})
+	end
+	return {
+		Scale = MINION_SCALE,
+		SkinColor = MINION_SKIN,
+		HairColor = Color3.fromRGB(200, 200, 210),
+		EyeColor = glow,
+		TopColor = MINION_TOP,
+		BottomColor = hat,
+		ShoeColor = MINION_BOOTS,
+		AttackMotion = "Shoot",
+		Attachments = {
+			Head = join({
+				hairCap(Color3.fromRGB(200, 200, 210)),
+				{
+					Shape = "Cylinder",
+					Size = Vector3.new(2.1, 0.12, 2.1),
+					Offset = CFrame.new(0, 0.62, 0.04),
+					Color = hat,
+				},
+			}, hatTiers),
+			Torso = { belt(BRASS) },
+			RightArm = {
+				{
+					Shape = "Ball",
+					Size = Vector3.one * 0.75,
+					Offset = CFrame.new(0, -1.15, -0.3),
+					Color = glow,
+					Material = Enum.Material.Neon,
+					Transparency = 0.15,
+				},
+			},
+		},
+	}
+end
+
 -- By unit type id. Haru's clone borrows Haru's look.
 Module.Looks = {
 	Haru = haru(),
@@ -1161,6 +1332,11 @@ Module.Looks = {
 	Kenji = kenji(),
 	Mio = mio(),
 	ShadowKnight = shadowKnight(),
+	Zib = swordMinion(MINION_SCALE, 1),
+	Quill = archerMinion(),
+	Blip = mageMinion(),
+	-- The super minion is a bigger, heavier swordsman.
+	MegaZib = swordMinion(0.8, 1.3),
 } :: { [string]: RigSpec? }
 
 return Module

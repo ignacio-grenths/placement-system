@@ -43,6 +43,7 @@ Module.StructureTeamGold = 150
 Module.UnitRewards = {
 	Zib = { Gold = 21, Xp = 75 },
 	Blip = { Gold = 14, Xp = 40 },
+	Quill = { Gold = 14, Xp = 40 },
 	GrubTank = { Gold = 60, Xp = 110 },
 	MegaZib = { Gold = 60, Xp = 110 },
 	Glorp = { Gold = 15, Xp = 30 },

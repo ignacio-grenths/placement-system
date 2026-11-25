@@ -97,6 +97,21 @@ function Module:Init()
 
 	for typeId, entry in UnitCatalog.Units do
 		local visual = entry.Visual
+		-- A unit with a look, like a lane minion, is drawn as a figure dressed
+		-- in its team's color.
+		local look = if CharacterLookCatalog.Looks[typeId] then getLook(typeId) else nil
+		if look then
+			UnitVisualsClientService:RegisterVisual(typeId, {
+				Shape = "Block",
+				Size = getFigureSize(look),
+				Style = "Rig",
+				Rig = look,
+				IsTeamDressed = true,
+				ProjectileSpeed = entry.Stats.ProjectileSpeed,
+				ProjectileStyle = visual.ProjectileStyle,
+			})
+			continue
+		end
 		UnitVisualsClientService:RegisterVisual(typeId, {
 			Shape = visual.Shape,
 			Size = visual.Size,
@@ -105,6 +120,7 @@ function Module:Init()
 			HasTeamRing = visual.Style ~= nil and RINGED_STYLES[visual.Style] == true,
 			Bob = visual.Bob,
 			ProjectileSpeed = entry.Stats.ProjectileSpeed,
+			ProjectileStyle = visual.ProjectileStyle,
 		})
 	end
 end

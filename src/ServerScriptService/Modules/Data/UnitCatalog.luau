@@ -10,6 +10,8 @@ export type VisualShape = "Ball" | "Block" | "Cylinder"
 -- Keep in sync with VisualStyle in UnitVisualsClientService, less Rig, which
 -- takes a look from CharacterLookCatalog.
 export type VisualStyle = "Plain" | "Alien" | "Tower" | "Gate" | "Core" | "Beast"
+-- Keep in sync with ProjectileStyle in UnitVisualsClientService.
+export type ProjectileStyle = "Orb" | "Arrow"
 
 export type UnitEntry = {
 	DisplayName: string,
@@ -24,6 +26,8 @@ export type UnitEntry = {
 		Style: VisualStyle?,
 		-- Studs the unit floats up and down. Zero when nil.
 		Bob: number?,
+		-- Orb when nil.
+		ProjectileStyle: ProjectileStyle?,
 	},
 }
 
@@ -58,6 +62,26 @@ Module.Units = {
 			ProjectileSpeed = 50,
 		},
 		Visual = { Shape = "Ball", Size = Vector3.new(2, 2, 2), Style = "Alien", Bob = 0.3 },
+	},
+	Quill = {
+		DisplayName = "Quill",
+		Stats = {
+			MaxHealth = 280,
+			Armor = 0,
+			AttackDamage = 18,
+			AttackRange = 16,
+			AttackInterval = 1.3,
+			MoveSpeed = 11,
+			Radius = 1,
+			ProjectileSpeed = 70,
+		},
+		Visual = {
+			Shape = "Ball",
+			Size = Vector3.new(2, 2, 2),
+			Style = "Alien",
+			Bob = 0.3,
+			ProjectileStyle = "Arrow",
+		},
 	},
 	GrubTank = {
 		DisplayName = "Grub Tank",
