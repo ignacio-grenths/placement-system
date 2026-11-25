@@ -21,30 +21,30 @@ const STROKE_THICKNESS = 2
 const LABEL_FONT = Enum.Font.GothamBold
 const NAME_PADDING = 6
 
-const READY_COLOR = Color3.fromRGB(34, 40, 54)
-const BLOCKED_COLOR = Color3.fromRGB(26, 26, 32)
-const EMPTY_COLOR = Color3.fromRGB(20, 22, 28)
-const STROKE_COLOR = Color3.fromRGB(110, 140, 190)
-const TEXT_COLOR = Color3.fromRGB(240, 242, 248)
-const MUTED_TEXT_COLOR = Color3.fromRGB(150, 155, 170)
+const READY_COLOR = Color3.fromRGB(26, 40, 44)
+const BLOCKED_COLOR = Color3.fromRGB(18, 22, 24)
+const EMPTY_COLOR = Color3.fromRGB(12, 18, 20)
+const STROKE_COLOR = Color3.fromRGB(200, 170, 110)
+const TEXT_COLOR = Color3.fromRGB(240, 230, 210)
+const MUTED_TEXT_COLOR = Color3.fromRGB(165, 158, 140)
 const COST_COLOR = Color3.fromRGB(120, 200, 255)
 const BLOCKED_COST_COLOR = Color3.fromRGB(255, 110, 110)
 const COOLDOWN_SHADE = Color3.new(0, 0, 0)
 const COOLDOWN_SHADE_TRANSPARENCY = 0.35
-const CHANNEL_BACKGROUND = Color3.fromRGB(20, 22, 28)
-const CHANNEL_FILL = Color3.fromRGB(120, 200, 255)
+const CHANNEL_BACKGROUND = Color3.fromRGB(12, 18, 20)
+const CHANNEL_FILL = Color3.fromRGB(240, 210, 130)
 -- Text is drawn see-through on buttons that can't cast, as a second cue to
 -- the darker fill and red cost.
 const BLOCKED_TEXT_TRANSPARENCY = 0.45
 const PIP_SIZE = 5
 const PIP_GAP = 3
 const PIP_LIT_COLOR = Color3.fromRGB(255, 215, 90)
-const PIP_DARK_COLOR = Color3.fromRGB(70, 74, 90)
+const PIP_DARK_COLOR = Color3.fromRGB(60, 66, 62)
 -- The + badge sits on the button's top-left corner.
 const RANK_UP_SIZE = 26
 const RANK_UP_TEXT_SIZE = 22
 const RANK_UP_COLOR = Color3.fromRGB(255, 215, 90)
-const RANK_UP_TEXT_COLOR = Color3.fromRGB(20, 22, 30)
+const RANK_UP_TEXT_COLOR = Color3.fromRGB(24, 18, 10)
 const COOLING_NAME_TRANSPARENCY = 0.85
 
 -- Sizes in UI units for a 1080p screen. The HUD's UIScale grows them on

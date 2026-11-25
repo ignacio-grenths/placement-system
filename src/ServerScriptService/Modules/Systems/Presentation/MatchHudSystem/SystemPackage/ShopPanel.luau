@@ -16,10 +16,10 @@ const ROW_HEIGHT = 64
 const BUY_BUTTON_SIZE = Vector2.new(120, 48)
 const HEADER_HEIGHT = 48
 const SCROLL_BAR_THICKNESS = 6
-const GOLD_COLOR = Color3.fromRGB(255, 205, 80)
-const PAIR_COLOR = Color3.fromRGB(110, 200, 255)
+const GOLD_COLOR = HudTheme.GoldColor
+const PAIR_COLOR = Color3.fromRGB(110, 210, 190)
 const BUY_COLOR = Color3.fromRGB(60, 140, 90)
-const DISABLED_COLOR = Color3.fromRGB(48, 50, 60)
+const DISABLED_COLOR = Color3.fromRGB(44, 48, 46)
 const TAG_WIDTH = 190
 const PAIR_LINE_HEIGHT = 40
 
@@ -192,6 +192,11 @@ local function shopPanel(props: ShopPanelProps)
 			BackgroundTransparency = HudTheme.PanelTransparency,
 			ZIndex = 6,
 
+			create("UIStroke")({
+				Color = HudTheme.BrightStrokeColor,
+				Thickness = 2,
+				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			}),
 			create("UICorner")({ CornerRadius = HudTheme.PanelCorner }),
 			create("UIPadding")({
 				PaddingTop = UDim.new(0, PADDING),
@@ -214,7 +219,7 @@ local function shopPanel(props: ShopPanelProps)
 					Name = "Title",
 					BackgroundTransparency = 1,
 					Size = UDim2.fromScale(0.3, 1),
-					Font = HudTheme.Font,
+					Font = HudTheme.TitleFont,
 					Text = "Shop",
 					TextSize = HudTheme.TitleTextSize,
 					TextColor3 = HudTheme.TextColor,

@@ -10,9 +10,9 @@ const HudTheme = require("./HudTheme")
 const SLOT_SIZE = 46
 const GAP = 6
 const BUTTON_HEIGHT = 46
-const GOLD_COLOR = Color3.fromRGB(255, 205, 80)
-const EMPTY_SLOT_COLOR = Color3.fromRGB(14, 16, 22)
-const FILLED_SLOT_COLOR = Color3.fromRGB(44, 52, 72)
+const GOLD_COLOR = HudTheme.GoldColor
+const EMPTY_SLOT_COLOR = Color3.fromRGB(8, 14, 16)
+const FILLED_SLOT_COLOR = Color3.fromRGB(30, 46, 50)
 const CONSUMABLE_STROKE_COLOR = Color3.fromRGB(120, 220, 150)
 
 export type ItemSlotView = {
@@ -53,6 +53,11 @@ local function textButton(
 		TextColor3 = HudTheme.TextColor,
 		Activated = onActivated,
 
+		create("UIStroke")({
+			Color = HudTheme.StrokeColor,
+			Thickness = 1,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		}),
 		create("UICorner")({ CornerRadius = HudTheme.PanelCorner }),
 		create("UIPadding")({
 			PaddingLeft = UDim.new(0, 12),

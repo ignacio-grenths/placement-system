@@ -9,10 +9,10 @@ const read = Vide.read
 const HudTheme = require("./HudTheme")
 
 -- The arena's own palette: dark metal floor, lit roads, an energy river.
-const GROUND_COLOR = Color3.fromRGB(14, 20, 34)
-const LANE_COLOR = Color3.fromRGB(70, 95, 135)
-const RIVER_COLOR = Color3.fromRGB(20, 110, 170)
-const WALL_COLOR = Color3.fromRGB(110, 125, 155)
+const GROUND_COLOR = Color3.fromRGB(26, 44, 28)
+const LANE_COLOR = Color3.fromRGB(150, 125, 80)
+const RIVER_COLOR = Color3.fromRGB(40, 120, 170)
+const WALL_COLOR = Color3.fromRGB(14, 26, 16)
 const LANE_THICKNESS = 5
 const RIVER_THICKNESS = 12
 const WALL_THICKNESS = 3
@@ -97,8 +97,8 @@ local function minimap(props: MinimapProps): Frame
 		ClipsDescendants = true,
 
 		create("UIStroke")({
-			Color = HudTheme.StrokeColor,
-			Thickness = 2,
+			Color = HudTheme.BrightStrokeColor,
+			Thickness = 3,
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		}),
 		path(props.River, getSize, RIVER_THICKNESS, RIVER_COLOR),

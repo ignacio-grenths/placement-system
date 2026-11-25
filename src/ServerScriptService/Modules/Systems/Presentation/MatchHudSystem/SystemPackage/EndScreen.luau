@@ -49,7 +49,7 @@ local function endScreen(props: EndScreenProps)
 				LayoutOrder = 1,
 				BackgroundTransparency = 1,
 				AutomaticSize = Enum.AutomaticSize.XY,
-				Font = HudTheme.Font,
+				Font = HudTheme.TitleFont,
 				Text = function()
 					return props.Result() or ""
 				end,

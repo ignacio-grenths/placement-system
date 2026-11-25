@@ -53,7 +53,7 @@ local function announcement(props: AnnouncementProps): Frame
 			Name = "Text",
 			BackgroundTransparency = 1,
 			AutomaticSize = Enum.AutomaticSize.XY,
-			Font = HudTheme.Font,
+			Font = HudTheme.TitleFont,
 			Text = function()
 				local message = props.Message()
 				return if message then message.Text else ""

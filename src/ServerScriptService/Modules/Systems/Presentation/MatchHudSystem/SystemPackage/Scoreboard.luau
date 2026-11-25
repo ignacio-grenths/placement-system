@@ -12,7 +12,7 @@ const HudTheme = require("./HudTheme")
 const COLUMN_WIDTH = 300
 const ROW_HEIGHT = 36
 const GAP = 16
-const HIGHLIGHT_COLOR = Color3.fromRGB(44, 52, 72)
+const HIGHLIGHT_COLOR = Color3.fromRGB(30, 46, 50)
 
 export type ScoreRow = {
 	Team: string,
@@ -141,6 +141,11 @@ local function scoreboard(props: ScoreboardProps)
 			BackgroundTransparency = HudTheme.PanelTransparency,
 			ZIndex = 5,
 
+			create("UIStroke")({
+				Color = HudTheme.StrokeColor,
+				Thickness = 1,
+				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			}),
 			create("UICorner")({ CornerRadius = HudTheme.PanelCorner }),
 			create("UIPadding")({
 				PaddingTop = UDim.new(0, GAP),

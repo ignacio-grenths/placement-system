@@ -19,15 +19,15 @@ const MINIMUM_FIT_SCALE = 0.5
 const CARD_RADIUS = 6
 const SWATCH_INSET = 4
 const CARD_COLOR = HudTheme.BarBackground
-const CARD_HOVER_COLOR = Color3.fromRGB(24, 36, 62)
-const IDLE_STROKE_COLOR = Color3.fromRGB(40, 56, 90)
+const CARD_HOVER_COLOR = Color3.fromRGB(24, 42, 44)
+const IDLE_STROKE_COLOR = Color3.fromRGB(80, 72, 52)
 const SELECTED_STROKE_THICKNESS = 3
 const BLOCKED_TRANSPARENCY = 0.3
 const LOCK_COLOR = Color3.fromRGB(60, 140, 90)
-const DISABLED_COLOR = Color3.fromRGB(48, 50, 60)
+const DISABLED_COLOR = Color3.fromRGB(44, 48, 46)
 const ROW_MARK_WIDTH = 4
 const ROW_TEXT_GAP = 8
-const NEUTRAL_MARK_COLOR = Color3.fromRGB(90, 100, 120)
+const NEUTRAL_MARK_COLOR = Color3.fromRGB(110, 105, 90)
 
 export type HeroCardView = {
 	Id: string,
@@ -617,7 +617,7 @@ local function heroSelectScreen(props: HeroSelectScreenProps)
 						label({
 							Name = "Title",
 							Size = UDim2.fromScale(0.5, 1),
-							Font = HudTheme.Font,
+							Font = HudTheme.TitleFont,
 							Text = "Choose your hero",
 							TextSize = function()
 								return metrics().TitleTextSize
@@ -738,7 +738,7 @@ local function heroSelectScreen(props: HeroSelectScreenProps)
 								Size = function()
 									return UDim2.new(1, 0, 0, metrics().TitleTextSize + 4)
 								end,
-								Font = HudTheme.Font,
+								Font = HudTheme.TitleFont,
 								Text = heroTitleText,
 								TextSize = function()
 									return metrics().TitleTextSize

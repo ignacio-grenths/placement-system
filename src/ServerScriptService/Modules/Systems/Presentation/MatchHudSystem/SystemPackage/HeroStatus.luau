@@ -60,6 +60,11 @@ local function heroStatus(props: HeroStatusProps): Frame
 		BackgroundTransparency = HudTheme.PanelTransparency,
 
 		create("UICorner")({ CornerRadius = HudTheme.PanelCorner }),
+		create("UIStroke")({
+			Color = HudTheme.StrokeColor,
+			Thickness = 1,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		}),
 		create("UIPadding")({
 			PaddingTop = UDim.new(0, HudTheme.PanelPadding),
 			PaddingBottom = UDim.new(0, HudTheme.PanelPadding),

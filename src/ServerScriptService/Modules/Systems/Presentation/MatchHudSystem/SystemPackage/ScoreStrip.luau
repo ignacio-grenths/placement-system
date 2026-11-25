@@ -64,6 +64,11 @@ local function scoreStrip(props: ScoreStripProps): Frame
 			BackgroundTransparency = HudTheme.PanelTransparency,
 
 			create("UICorner")({ CornerRadius = HudTheme.PanelCorner }),
+			create("UIStroke")({
+				Color = HudTheme.StrokeColor,
+				Thickness = 1,
+				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			}),
 			create("UIListLayout")({
 				FillDirection = Enum.FillDirection.Horizontal,
 				VerticalAlignment = Enum.VerticalAlignment.Center,
@@ -97,6 +102,11 @@ local function scoreStrip(props: ScoreStripProps): Frame
 			Activated = props.OnScoresPressed,
 
 			create("UICorner")({ CornerRadius = HudTheme.PanelCorner }),
+			create("UIStroke")({
+				Color = HudTheme.StrokeColor,
+				Thickness = 1,
+				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			}),
 		}),
 	})
 end
