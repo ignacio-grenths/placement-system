@@ -11,7 +11,7 @@ const MapClientService = require("../SystemPackage/MapClientService")
 const TERRAIN_COLORS: { [Enum.Material]: Color3 } = {
 	-- Open ground along the lanes, with paler meadow patches.
 	[Enum.Material.Ground] = Color3.fromRGB(104, 140, 62),
-	[Enum.Material.Sand] = Color3.fromRGB(138, 168, 84),
+	[Enum.Material.Sand] = Color3.fromRGB(124, 150, 76),
 	-- Jungle soil, with patches of moss.
 	[Enum.Material.Mud] = Color3.fromRGB(58, 76, 42),
 	[Enum.Material.LeafyGrass] = Color3.fromRGB(46, 104, 58),
@@ -23,8 +23,11 @@ const TERRAIN_COLORS: { [Enum.Material]: Color3 } = {
 	[Enum.Material.Slate] = Color3.fromRGB(86, 90, 80),
 	-- Blue-gray boulders and the waterfall's cliff, along the river.
 	[Enum.Material.Limestone] = Color3.fromRGB(92, 94, 104),
+	-- Worn dirt of the lanes and jungle trails.
+	[Enum.Material.Sandstone] = Color3.fromRGB(150, 116, 78),
+	-- Old flagstones paving the lanes around towers and gates.
+	[Enum.Material.Pavement] = Color3.fromRGB(128, 122, 108),
 }
-const LANE_COLOR = Color3.fromRGB(168, 132, 88)
 const BLUE_SIDE_COLOR = Color3.fromRGB(90, 160, 255)
 const RED_SIDE_COLOR = Color3.fromRGB(255, 100, 115)
 const SIDE_COLORS: { [MapLayout.MapTeam]: Color3 } = {
@@ -90,7 +93,16 @@ const JUNGLE_LANE_GAP = 10
 const JUNGLE_RIVER_GAP = 6
 -- Studs the brush floor reaches past the patch's edge.
 const BRUSH_FLOOR_MARGIN = 1
-const LANE_EDGE_WIDTH = 0.5
+-- Path edges wander in and out by up to these many studs, a broad sway plus
+-- a fine fray, so grass creeps into the dirt instead of meeting a ruled line.
+const PATH_SWAY = 3
+const PATH_FRAY = 2
+-- Pale worn grass this many studs wide runs along each lane's edge.
+const LANE_VERGE = 3
+const TRAIL_WIDTH = 7
+-- Flagstones pave the lane within about this many studs of a tower or gate.
+const FLAGSTONE_REACH = 24
+const FLAGSTONE_WOBBLE = 6
 const BASE_EDGE_WIDTH = 0.8
 const BASE_INNER_INSET = 8
 -- Ground this close above the water's surface is drawn as the muddy bed.
@@ -159,12 +171,9 @@ const BLADES_PER_STUD = 1.1
 const BASE_BLADES = 14
 const BULBS_PER_BRUSH = 3
 
--- Draw order, bottom to top. Lanes run on into the bases, under the bases'
--- borders.
+-- Draw order, bottom to top.
 const RING_FLOOR_LAYER = 2
 const BASE_LAYER = 2.2
-const LANE_LAYER = 3
-const LANE_EDGE_LAYER = 3.5
 const RING_LAYER = 3.7
 const BASE_EDGE_LAYER = 4.5
 const DETAIL_LAYER = 5
@@ -192,94 +201,9 @@ local Module = {}
 
 local random = Random.new(SCENERY_SEED)
 
-local function getPathLength(points: { Vector3 }): number
-	local length = 0
-	for index = 1, #points - 1 do
-		length += (points[index + 1] - points[index]).Magnitude
-	end
-	return length
-end
-
---[[
-	Splits a path at the share of its length given, returning the part before
-	and the part after.
-]]
-local function splitPath(points: { Vector3 }, share: number): ({ Vector3 }, { Vector3 })
-	local target = getPathLength(points) * share
-	local walked = 0
-	local before = { points[1] }
-	for index = 1, #points - 1 do
-		local from = points[index]
-		local to = points[index + 1]
-		local length = (to - from).Magnitude
-		if walked + length >= target and length > 0 then
-			local middle = from + (to - from) * ((target - walked) / length)
-			table.insert(before, middle)
-			local after = { middle }
-			table.move(points, index + 1, #points, 2, after)
-			return before, after
-		end
-		walked += length
-		table.insert(before, to)
-	end
-	return before, {}
-end
-
-local function removeRepeats(points: { Vector3 }): { Vector3 }
-	local kept = {}
-	for _, point in points do
-		local last = kept[#kept]
-		if not last or (point - last).Magnitude > 0.01 then
-			table.insert(kept, point)
-		end
-	end
-	return kept
-end
-
 local function getNormal(from: Vector3, to: Vector3): Vector3
 	local direction = to - from
 	return Vector3.new(-direction.Z, 0, direction.X).Unit
-end
-
---[[
-	Returns the path shifted sideways by distance with mitered corners, so
-	edge lines drawn along it meet exactly where the path turns instead of
-	crossing on the inside of the turn.
-]]
-local function offsetPath(points: { Vector3 }, distance: number): { Vector3 }
-	local shifted = table.create(#points)
-	for index, point in points do
-		local before = if index > 1 then getNormal(points[index - 1], point) else nil
-		local after = if index < #points then getNormal(point, points[index + 1]) else nil
-		local normal = if before and after
-			then (before + after).Unit
-			else (before or after) :: Vector3
-		-- A corner's offset point sits further out so both edges stay at
-		-- distance from their own segment.
-		local stretch = if before then 1 / normal:Dot(before) else 1
-		table.insert(shifted, point + normal * distance * stretch)
-	end
-	return shifted
-end
-
-local function drawPathEdges(points: { Vector3 }, width: number, color: Color3)
-	local path = removeRepeats(points)
-	if #path < 2 then
-		return
-	end
-	for _, side in { 1, -1 } do
-		local edge = offsetPath(path, side * width / 2)
-		for index = 1, #edge - 1 do
-			MapClientService:DrawLine(
-				edge[index],
-				edge[index + 1],
-				LANE_EDGE_WIDTH,
-				color,
-				LANE_EDGE_LAYER,
-				NEON
-			)
-		end
-	end
 end
 
 local function toSegments(points: { Vector3 }, segments: { Segment })
@@ -322,7 +246,8 @@ end
 
 --[[
 	Returns the function that picks the ground's material and height at each
-	spot: meadow along the lanes and the river, mud under the water, dark
+	spot: worn dirt lanes and trails with ragged edges, flagstones around
+	towers, meadow along the lanes and the river, mud under the water, dark
 	soil and moss in the jungle, grass under brush, and dark rock past the
 	arena's edge.
 ]]
@@ -331,8 +256,25 @@ local function createGroundPicker(): (x: number, z: number) -> (Enum.Material, n
 	for _, road in MapGround.Roads do
 		toSegments(road, laneSegments)
 	end
+	local trailSegments: { Segment } = {}
+	for _, trail in MapLayout.Trails do
+		toSegments(trail, trailSegments)
+	end
 	local riverSegments: { Segment } = {}
 	toSegments(MapLayout.River, riverSegments)
+	local towers: { Vector3 } = {}
+	for _, spot in MapLayout.Structures do
+		if spot.Tier ~= "Core" then
+			table.insert(towers, spot.Position)
+		end
+	end
+	local function getNearestTowerDistance(x: number, z: number): number
+		local nearest = math.huge
+		for _, tower in towers do
+			nearest = math.min(nearest, math.sqrt((x - tower.X) ^ 2 + (z - tower.Z) ^ 2))
+		end
+		return nearest
+	end
 	local brushSegments: { Segment } = {}
 	local brushRadii: { number } = {}
 	for _, brush in MapLayout.Brushes do
@@ -357,7 +299,23 @@ local function createGroundPicker(): (x: number, z: number) -> (Enum.Material, n
 					return Enum.Material.Grass
 				end
 			end
-			local isJungle = getNearestDistance(x, z, laneSegments) > laneReach
+			local laneDistance = getNearestDistance(x, z, laneSegments)
+			local fray = math.noise(x / 24, z / 24, 0.91) * PATH_SWAY
+				+ math.noise(x / 6, z / 6, 0.47) * PATH_FRAY
+			if laneDistance + fray <= MapLayout.LaneWidth / 2 then
+				local paving = getNearestTowerDistance(x, z)
+					+ math.noise(x / 12, z / 12, 0.29) * FLAGSTONE_WOBBLE
+				return if paving <= FLAGSTONE_REACH
+					then Enum.Material.Pavement
+					else Enum.Material.Sandstone
+			end
+			if getNearestDistance(x, z, trailSegments) + fray * 0.6 <= TRAIL_WIDTH / 2 then
+				return Enum.Material.Sandstone
+			end
+			if laneDistance + fray <= MapLayout.LaneWidth / 2 + LANE_VERGE then
+				return Enum.Material.Sand
+			end
+			local isJungle = laneDistance > laneReach
 				and getNearestDistance(x, z, riverSegments) > riverReach
 				and not isInsideBase(x, z)
 			if isJungle then
@@ -611,19 +569,6 @@ local function drawCrashRing()
 		Material = Enum.Material.Neon,
 		Transparency = 0.5,
 	})
-end
-
-local function drawLanes()
-	for _, road in MapGround.Roads do
-		MapClientService:DrawPath(road, MapLayout.LaneWidth, LANE_COLOR, LANE_LAYER, {
-			Material = Enum.Material.Slate,
-		})
-
-		-- Each lane's edges glow in the color of the side that holds that half.
-		local blueHalf, redHalf = splitPath(road, 0.5)
-		drawPathEdges(blueHalf, MapLayout.LaneWidth, BLUE_SIDE_COLOR)
-		drawPathEdges(redHalf, MapLayout.LaneWidth, RED_SIDE_COLOR)
-	end
 end
 
 local function drawBases()
@@ -1066,7 +1011,6 @@ function Module:Start()
 	drawGround()
 	drawRiver()
 	drawCrashRing()
-	drawLanes()
 	drawBases()
 	drawCamps()
 	drawLaunchPads()

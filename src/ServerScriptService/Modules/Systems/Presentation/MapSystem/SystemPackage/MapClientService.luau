@@ -190,25 +190,6 @@ function Module:DrawLine(
 end
 
 --[[
-	Draws a flat band through the points, with round joints so corners have
-	no gaps.
-]]
-function Module:DrawPath(
-	points: { Vector3 },
-	width: number,
-	color: Color3,
-	layer: number,
-	options: SurfaceOptions?
-)
-	for index = 1, #points - 1 do
-		Module:DrawLine(points[index], points[index + 1], width, color, layer, options)
-	end
-	for _, point in points do
-		Module:DrawDisc(point, width / 2, color, layer, options)
-	end
-end
-
---[[
 	Draws a flat ring whose band is centered on radius, built from straight
 	pieces short enough to read as a curve.
 ]]

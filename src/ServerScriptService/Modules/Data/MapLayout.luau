@@ -157,6 +157,30 @@ const BLUE_BRUSHES: { BrushSpot } = {
 	{ From = at(204, 322), To = at(218, 322), Radius = BRUSH_RADIUS },
 }
 
+-- Blue's half of the jungle's dirt trails. Drawn only: units walk anywhere
+-- off the walls.
+const BLUE_TRAILS: { { Vector3 } } = {
+	-- West jungle, threaded through the gaps between its walls.
+	{ at(45, 138), at(68, 146), at(85, 150), at(92, 175), at(100, 200) },
+	{ at(100, 200), at(106, 224), at(115, 234), at(125, 235), at(145, 252) },
+	{ at(100, 200), at(125, 185), at(145, 165) },
+	{ at(45, 262), at(80, 255), at(105, 242), at(125, 235) },
+	-- South jungle.
+	{
+		at(172, 355),
+		at(165, 320),
+		at(187, 308),
+		at(210, 300),
+		at(232, 307),
+		at(255, 318),
+		at(270, 340),
+		at(275, 355),
+	},
+	{ at(210, 300), at(215, 275), at(235, 248) },
+	{ at(110, 290), at(135, 305), at(165, 320) },
+	{ at(160, 240), at(185, 265), at(210, 300) },
+}
+
 const BLUE_LAUNCH_PADS: { LaunchPad } = {
 	{ Team = "Blue", Position = at(80, 255), Landing = at(150, 150) },
 	{ Team = "Blue", Position = at(135, 305), Landing = at(250, 250) },
@@ -236,6 +260,14 @@ local function buildBrushes(): { BrushSpot }
 	return brushes
 end
 
+local function buildTrails(): { { Vector3 } }
+	local trails = table.clone(BLUE_TRAILS)
+	for _, trail in BLUE_TRAILS do
+		table.insert(trails, mirrorAll(trail))
+	end
+	return trails
+end
+
 local function buildLaunchPads(): { LaunchPad }
 	local pads = table.clone(BLUE_LAUNCH_PADS)
 	for _, pad in BLUE_LAUNCH_PADS do
@@ -271,6 +303,7 @@ Module.Structures = buildStructures()
 Module.Camps = buildCamps()
 Module.Walls = buildWalls()
 Module.Brushes = buildBrushes()
+Module.Trails = buildTrails()
 Module.LaunchPads = buildLaunchPads()
 
 Module.Bases = {
