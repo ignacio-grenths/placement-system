@@ -26,9 +26,9 @@
         "GeographicLatitude": 25,
         "Brightness": 2,
         "ExposureCompensation": 0,
-        "Ambient": { "Color3": [0.09, 0.06, 0.14] },
-        "OutdoorAmbient": { "Color3": [0.34, 0.26, 0.44] },
-        "ColorShift_Top": { "Color3": [0.78, 0.68, 1] },
+        "Ambient": { "Color3": [0.1, 0.11, 0.09] },
+        "OutdoorAmbient": { "Color3": [0.42, 0.42, 0.36] },
+        "ColorShift_Top": { "Color3": [1, 0.92, 0.78] },
         "EnvironmentDiffuseScale": 0.4,
         "EnvironmentSpecularScale": 0,
         "GlobalShadows": true,
@@ -50,7 +50,7 @@
           "Brightness": 0,
           "Contrast": 0.12,
           "Saturation": 0.15,
-          "TintColor": { "Color3": [0.98, 0.95, 1] }
+          "TintColor": { "Color3": [1, 0.98, 0.94] }
         }
       },
       "SunRays": {
@@ -64,8 +64,8 @@
         "$properties": {
           "Density": 0.2,
           "Offset": 0.1,
-          "Color": { "Color3": [0.55, 0.4, 0.75] },
-          "Decay": { "Color3": [0.3, 0.15, 0.45] },
+          "Color": { "Color3": [0.72, 0.82, 0.9] },
+          "Decay": { "Color3": [0.42, 0.55, 0.62] },
           "Glare": 0,
           "Haze": 1.2
         }

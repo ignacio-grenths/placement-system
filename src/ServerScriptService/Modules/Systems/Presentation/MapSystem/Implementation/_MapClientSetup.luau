@@ -4,64 +4,64 @@ const MapLayout = require("@game/ServerScriptService/Modules/Data/MapLayout")
 
 const MapClientService = require("../SystemPackage/MapClientService")
 
--- Crashpoint Valley lies on a violet alien world where a mothership came
--- down. The ground stays mid-dark and calm so units, which carry the bright
--- team colors, read against it; teal crystals and plants carry the glow.
+-- Crashpoint Valley is a sunlit fantasy forest. The ground stays mid-toned
+-- and calm so units, which carry the bright team colors, read against it;
+-- warm dirt lanes mark where to walk and dark woods mark where you can't.
 const TERRAIN_COLORS: { [Enum.Material]: Color3 } = {
-	-- Open ground along the lanes, with paler drifts.
-	[Enum.Material.Ground] = Color3.fromRGB(88, 64, 120),
-	[Enum.Material.Sand] = Color3.fromRGB(128, 102, 164),
-	-- Jungle soil, with patches of teal moss.
-	[Enum.Material.Mud] = Color3.fromRGB(60, 45, 88),
-	[Enum.Material.LeafyGrass] = Color3.fromRGB(38, 108, 100),
+	-- Open ground along the lanes, with paler meadow patches.
+	[Enum.Material.Ground] = Color3.fromRGB(104, 140, 62),
+	[Enum.Material.Sand] = Color3.fromRGB(138, 168, 84),
+	-- Jungle soil, with patches of moss.
+	[Enum.Material.Mud] = Color3.fromRGB(58, 76, 42),
+	[Enum.Material.LeafyGrass] = Color3.fromRGB(46, 104, 58),
 	-- The floor under brush, so a patch reads from far away.
-	[Enum.Material.Grass] = Color3.fromRGB(30, 150, 128),
-	-- Rock walls, ridges, and the plains beyond the arena.
-	[Enum.Material.Rock] = Color3.fromRGB(88, 68, 120),
-	[Enum.Material.Basalt] = Color3.fromRGB(38, 30, 54),
-	[Enum.Material.Slate] = Color3.fromRGB(60, 48, 86),
+	[Enum.Material.Grass] = Color3.fromRGB(70, 160, 70),
+	-- Stone walls, ridges, and the hills beyond the arena.
+	[Enum.Material.Rock] = Color3.fromRGB(112, 108, 98),
+	[Enum.Material.Basalt] = Color3.fromRGB(46, 62, 40),
+	[Enum.Material.Slate] = Color3.fromRGB(86, 90, 80),
 }
-const LANE_COLOR = Color3.fromRGB(96, 84, 132)
+const LANE_COLOR = Color3.fromRGB(168, 132, 88)
 const BLUE_SIDE_COLOR = Color3.fromRGB(90, 160, 255)
 const RED_SIDE_COLOR = Color3.fromRGB(255, 100, 115)
 const SIDE_COLORS: { [MapLayout.MapTeam]: Color3 } = {
 	Blue = BLUE_SIDE_COLOR,
 	Red = RED_SIDE_COLOR,
 }
-const RIVER_BED_COLOR = Color3.fromRGB(12, 46, 56)
-const RIVER_ENERGY_COLOR = Color3.fromRGB(30, 200, 180)
-const RIVER_BANK_COLOR = Color3.fromRGB(90, 255, 220)
--- The liquid's surface lets a little of the dark bed through.
-const RIVER_ENERGY_TRANSPARENCY = 0.2
-const RING_FLOOR_COLOR = Color3.fromRGB(40, 28, 66)
-const RING_COLOR = Color3.fromRGB(190, 120, 255)
+const RIVER_BED_COLOR = Color3.fromRGB(26, 64, 92)
+const RIVER_ENERGY_COLOR = Color3.fromRGB(70, 150, 220)
+const RIVER_BANK_COLOR = Color3.fromRGB(190, 230, 255)
+-- The water's surface lets a little of the dark bed through.
+const RIVER_ENERGY_TRANSPARENCY = 0.25
+const RING_FLOOR_COLOR = Color3.fromRGB(96, 98, 86)
+const RING_COLOR = Color3.fromRGB(255, 210, 110)
 const BASE_COLORS: { [MapLayout.MapTeam]: Color3 } = {
-	Blue = Color3.fromRGB(26, 36, 70),
-	Red = Color3.fromRGB(70, 26, 44),
+	Blue = Color3.fromRGB(150, 160, 178),
+	Red = Color3.fromRGB(150, 120, 110),
 }
-const PAD_FLOOR_COLOR = Color3.fromRGB(34, 26, 52)
+const PAD_FLOOR_COLOR = Color3.fromRGB(90, 92, 82)
 const CAMP_COLORS: { [MapLayout.CampKind]: Color3 } = {
-	Small = Color3.fromRGB(90, 220, 160),
+	Small = Color3.fromRGB(150, 230, 110),
 	CrystalGolem = Color3.fromRGB(110, 180, 255),
 	EmberBeetle = Color3.fromRGB(255, 130, 60),
 	Skyray = Color3.fromRGB(120, 230, 255),
 	HiveQueen = Color3.fromRGB(190, 90, 230),
 }
-const LAUNCH_COLOR = Color3.fromRGB(120, 255, 180)
-const CRYSTAL_COLOR = Color3.fromRGB(100, 235, 220)
-const CRYSTAL_CORE_COLOR = Color3.fromRGB(150, 255, 235)
+const LAUNCH_COLOR = Color3.fromRGB(255, 220, 120)
+const CRYSTAL_COLOR = Color3.fromRGB(150, 190, 255)
+const CRYSTAL_CORE_COLOR = Color3.fromRGB(210, 230, 255)
 const PLANT_COLORS = {
-	Color3.fromRGB(36, 150, 130),
-	Color3.fromRGB(26, 112, 104),
-	Color3.fromRGB(110, 66, 160),
+	Color3.fromRGB(60, 140, 60),
+	Color3.fromRGB(40, 110, 54),
+	Color3.fromRGB(96, 150, 56),
 }
-const STALK_COLOR = Color3.fromRGB(84, 58, 128)
-const BULB_COLOR = Color3.fromRGB(130, 255, 225)
+const STALK_COLOR = Color3.fromRGB(86, 70, 44)
+const BULB_COLOR = Color3.fromRGB(255, 225, 120)
 const CAP_COLORS = {
-	Color3.fromRGB(180, 110, 255),
-	Color3.fromRGB(90, 240, 220),
+	Color3.fromRGB(220, 60, 50),
+	Color3.fromRGB(255, 160, 70),
 }
-const HULL_COLOR = Color3.fromRGB(86, 92, 110)
+const HULL_COLOR = Color3.fromRGB(120, 110, 96)
 -- Bloom pushes orange toward yellow, so the glow starts deep.
 const HULL_GLOW_COLOR = Color3.fromRGB(255, 110, 50)
 
