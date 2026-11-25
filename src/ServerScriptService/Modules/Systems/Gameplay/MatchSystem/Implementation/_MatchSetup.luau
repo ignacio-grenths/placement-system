@@ -1,12 +1,14 @@
 --!strict
 
 const HeroCatalog = require("@game/ServerScriptService/Modules/Data/HeroCatalog")
+const StoreCatalog = require("@game/ServerScriptService/Modules/Data/StoreCatalog")
 
 const MatchServerService = require("../SystemPackage/MatchServerService")
 
--- One hero per role, handed out first to players who pick none. Every other
--- catalog hero follows them in the pool.
-const DEFAULT_HEROES = { "Haru", "Ryuka", "Torvik", "SeoDan", "Brakk" }
+-- One hero per role, handed out first to players who pick none. They are the
+-- free heroes, so every player owns them. Every other catalog hero follows
+-- them in the pool.
+const DEFAULT_HEROES = StoreCatalog.FreeHeroes
 
 const MatchTypes = require("../SystemPackage/MatchTypes")
 

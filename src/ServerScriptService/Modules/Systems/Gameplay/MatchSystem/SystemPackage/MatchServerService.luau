@@ -19,6 +19,8 @@ const SELECT_SECONDS = 30
 const LOAD_WAIT_SECONDS = 20
 const TEAMS = { "Blue", "Red" }
 const REQUESTS_PER_SECOND = 10
+-- A primary and a secondary position.
+const MAX_PREFERRED_ROLES = 2
 
 const MatchTypes = require("./MatchTypes")
 
@@ -49,6 +51,7 @@ local heroPool: { PoolHero } = {}
 local isFillingWithBots = false
 local isSpectating = false
 local botHeroPicker: ((Team, Role) -> string)? = nil
+local heroAccessCheck: ((Player, string) -> boolean)? = nil
 local phase: Phase = "Waiting"
 local startTime = 0
 -- Bumped each time selection starts, so an earlier selection's timer can tell
@@ -294,6 +297,29 @@ local function onLoaded(player: Player)
 	end
 end
 
+local function canUseHero(player: Player, heroId: string): boolean
+	return heroAccessCheck == nil or heroAccessCheck(player, heroId)
+end
+
+--[[
+	The first hero the player may use in the first of their roles that has
+	one open, or "" when none does.
+]]
+local function findPreferredHero(player: Player, pick: Pick, preferredRoles: { Role }): string
+	for _, role in preferredRoles do
+		for _, hero in heroPool do
+			if
+				hero.Role == role
+				and canUseHero(player, hero.HeroId)
+				and PickRules.isHeroOpen(picks, heroPool, pick, hero.HeroId)
+			then
+				return hero.HeroId
+			end
+		end
+	end
+	return ""
+end
+
 local function isRequestAllowed(player: Player): boolean
 	-- Requests arrive in real time, whatever speed the simulation runs at.
 	local now = os.clock()
@@ -314,6 +340,7 @@ local function onPickHero(player: Player, heroId: unknown)
 		not pick
 		or pick.IsLockedIn
 		or pick.HeroId == heroId
+		or not canUseHero(player, heroId)
 		or not PickRules.isHeroOpen(picks, heroPool, pick, heroId)
 	then
 		return
@@ -330,6 +357,7 @@ local function onLockIn(player: Player)
 	if
 		not pick
 		or pick.IsLockedIn
+		or not canUseHero(player, pick.HeroId)
 		or not PickRules.isHeroOpen(picks, heroPool, pick, pick.HeroId)
 	then
 		return
@@ -354,7 +382,7 @@ local function onLockIn(player: Player)
 	end
 end
 
-local function onPlayerAdded(player: Player)
+local function joinMatch(player: Player, preferredRoles: { Role })
 	if phase == "Ended" or findByPlayer(player) or findPick(player) then
 		return
 	end
@@ -375,17 +403,41 @@ local function onPlayerAdded(player: Player)
 		return
 	end
 
-	table.insert(picks, {
+	local pick: Pick = {
 		UserId = player.UserId,
 		Name = player.DisplayName,
 		Team = team,
 		HeroId = "",
 		IsLockedIn = false,
-	})
+	}
+	pick.HeroId = findPreferredHero(player, pick, preferredRoles)
+	table.insert(picks, pick)
 	publishPicks()
 	if phase == "Waiting" then
 		startSelecting()
 	end
+end
+
+-- Spectators never see the lobby, so they join on arrival. Everyone else
+-- joins from the lobby's Find Match.
+local function onPlayerAdded(player: Player)
+	if isSpectating then
+		joinMatch(player, {})
+	end
+end
+
+local function onJoinMatch(player: Player, preferredRoles: unknown)
+	if isSpectating or typeof(preferredRoles) ~= "table" or not isRequestAllowed(player) then
+		return
+	end
+	local validRoles: { Role } = {}
+	for index = 1, MAX_PREFERRED_ROLES do
+		local role = (preferredRoles :: { unknown })[index]
+		if typeof(role) == "string" and table.find(roles, role :: Role) then
+			table.insert(validRoles, role :: Role)
+		end
+	end
+	joinMatch(player, validRoles)
 end
 
 local function onPlayerRemoving(player: Player)
@@ -450,6 +502,7 @@ end
 ]]
 function Module:SetPlayersSpectate(isOn: boolean)
 	isSpectating = isOn
+	MatchNetwork.MatchState:SetAttribute("PlayersSpectate", isOn)
 end
 
 --[[
@@ -464,6 +517,13 @@ function Module:StartBotMatch()
 	end
 	startMatch()
 	fillWithBots()
+end
+
+--[[
+	Sets which heroes a player may pick. Nil lets everyone pick any hero.
+]]
+function Module:SetHeroAccessCheck(check: ((player: Player, heroId: string) -> boolean)?)
+	heroAccessCheck = check
 end
 
 --[[
@@ -540,6 +600,7 @@ function Module:Init()
 	MatchNetwork.PickHero.OnServerEvent:Connect(onPickHero)
 	MatchNetwork.LockIn.OnServerEvent:Connect(onLockIn)
 	MatchNetwork.Loaded.OnServerEvent:Connect(onLoaded)
+	MatchNetwork.JoinMatch.OnServerEvent:Connect(onJoinMatch)
 end
 
 function Module:Start()

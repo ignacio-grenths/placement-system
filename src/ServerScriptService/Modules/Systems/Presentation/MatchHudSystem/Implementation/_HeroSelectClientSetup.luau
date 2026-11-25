@@ -17,6 +17,9 @@ const MatchNetwork = require(
 	"@game/ServerScriptService/Modules/Systems/Gameplay/MatchSystem/SystemPackage/MatchNetwork"
 )
 const Screen = require("@game/ServerScriptService/Modules/Utilities/Screen")
+const StoreClientService = require(
+	"@game/ServerScriptService/Modules/Systems/Economy/StoreSystem/SystemPackage/StoreClientService"
+)
 
 const HeroSelectScreen = require("../SystemPackage/HeroSelectScreen")
 
@@ -62,7 +65,11 @@ local function decodeAttribute(name: string): any
 	return {}
 end
 
-local function buildCard(poolHero: PoolHero, isRoleTaken: { [string]: boolean? }): HeroCardView?
+local function buildCard(
+	poolHero: PoolHero,
+	isRoleTaken: { [string]: boolean? },
+	ownedItems: { [string]: boolean? }
+): HeroCardView?
 	local hero = HeroCatalog.Heroes[poolHero.HeroId]
 	if not hero then
 		return nil
@@ -84,7 +91,10 @@ local function buildCard(poolHero: PoolHero, isRoleTaken: { [string]: boolean? }
 			else hero.Resource :: string,
 		Abilities = abilities,
 		Color = hero.Color,
-		Blocked = if isRoleTaken[poolHero.Role] then "Taken" else nil,
+		Blocked = if isRoleTaken[poolHero.Role]
+			then "Taken"
+			elseif not ownedItems[poolHero.HeroId] then "Locked"
+			else nil,
 	}
 end
 
@@ -119,9 +129,10 @@ local function refresh()
 		end
 	end
 
+	local ownedItems = StoreClientService:GetOwnedItems()
 	local cards: { HeroCardView } = {}
 	for _, poolHero in pool do
-		local card = buildCard(poolHero, isRoleTaken)
+		local card = buildCard(poolHero, isRoleTaken, ownedItems)
 		if card then
 			table.insert(cards, card)
 		end
@@ -218,6 +229,7 @@ function Module:Start()
 		MatchNetwork.MatchState:GetAttributeChangedSignal(name):Connect(handler)
 	end
 	RunService.Heartbeat:Connect(onHeartbeat)
+	StoreClientService.WalletChanged:Connect(refresh)
 
 	if not reportLoadedIfReady() then
 		local connection: RBXScriptConnection
