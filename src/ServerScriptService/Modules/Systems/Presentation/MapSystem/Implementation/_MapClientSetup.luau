@@ -61,9 +61,17 @@ const CAP_COLORS = {
 	Color3.fromRGB(220, 60, 50),
 	Color3.fromRGB(255, 160, 70),
 }
-const HULL_COLOR = Color3.fromRGB(120, 110, 96)
--- Bloom pushes orange toward yellow, so the glow starts deep.
-const HULL_GLOW_COLOR = Color3.fromRGB(255, 110, 50)
+const TRUNK_COLOR = Color3.fromRGB(96, 70, 46)
+-- Mostly greens, with a few autumn trees so the forest isn't one flat color.
+const LEAF_COLORS = {
+	Color3.fromRGB(46, 120, 56),
+	Color3.fromRGB(36, 98, 50),
+	Color3.fromRGB(70, 140, 52),
+	Color3.fromRGB(46, 120, 56),
+	Color3.fromRGB(220, 150, 50),
+}
+const RUIN_COLOR = Color3.fromRGB(150, 146, 132)
+const RUNE_COLOR = Color3.fromRGB(120, 200, 255)
 
 -- Every client builds the same scenery from the same seed.
 const SCENERY_SEED = 7331
@@ -107,8 +115,11 @@ const RIDGE_MIN_RADIUS = 8
 const RIDGE_MAX_RADIUS = 13
 const HILL_COUNT = 36
 const CRATER_COUNT = 7
-const OUTSIDE_CRYSTAL_COUNT = 14
+const OUTSIDE_CRYSTAL_COUNT = 6
 const MUSHROOM_COUNT = 18
+const OUTSIDE_TREE_COUNT = 90
+const RIDGE_TREE_COUNT = 40
+const TREES_PER_WALL = 3
 -- Plant blades per stud of a brush patch's length, on top of a base count.
 const BLADES_PER_STUD = 1.1
 const BASE_BLADES = 14
@@ -523,7 +534,7 @@ local function drawLaunchPads()
 end
 
 --[[
-	A cluster of teal crystal shards leaning out from a point on the ground,
+	A cluster of magic crystal shards leaning out from a point on the ground,
 	the tallest with a glowing core.
 ]]
 local function drawCrystals(base: Vector3, scale: number)
@@ -554,8 +565,39 @@ local function drawCrystals(base: Vector3, scale: number)
 end
 
 --[[
+	A round, puffy storybook tree: a trunk under a cluster of leaf balls.
+]]
+local function drawTree(base: Vector3, scale: number)
+	local height = random:NextNumber(4, 6) * scale
+	local leaves = LEAF_COLORS[random:NextInteger(1, #LEAF_COLORS)]
+	MapClientService:DrawProp(
+		CFrame.new(base + Vector3.new(0, height / 2, 0)),
+		Vector3.new(0.9 * scale, height, 0.9 * scale),
+		TRUNK_COLOR,
+		{ Shape = "Cylinder" }
+	)
+	local crown = base + Vector3.new(0, height, 0)
+	for index = 1, random:NextInteger(2, 4) do
+		local size = random:NextNumber(3.5, 5) * scale * (if index == 1 then 1.2 else 1)
+		local offset = if index == 1
+			then Vector3.zero
+			else Vector3.new(
+				random:NextNumber(-1.6, 1.6),
+				random:NextNumber(-0.8, 1),
+				random:NextNumber(-1.6, 1.6)
+			) * scale
+		MapClientService:DrawProp(
+			CFrame.new(crown + offset),
+			Vector3.one * size,
+			leaves,
+			{ Shape = "Ball", CastsShadow = true }
+		)
+	end
+end
+
+--[[
 	Draws each jungle wall as the server shapes it, a thick line with round
-	ends, built as a ridge of violet rock with crystals breaking through.
+	ends, built as a stone ridge with trees growing on top.
 ]]
 local function drawJungleWalls()
 	local terrain = workspace.Terrain
@@ -575,16 +617,17 @@ local function drawJungleWalls()
 			terrain:FillBall(point + lift, wall.Radius, Enum.Material.Rock)
 		end
 
-		-- Crystals break out of the ridge's top.
-		local top = Vector3.new(0, JUNGLE_WALL_HEIGHT - 1, 0)
-		drawCrystals(wall.From:Lerp(wall.To, random:NextNumber(0.2, 0.45)) + top, 0.8)
-		drawCrystals(wall.From:Lerp(wall.To, random:NextNumber(0.6, 0.85)) + top, 0.6)
+		local top = Vector3.new(0, JUNGLE_WALL_HEIGHT - 1.5, 0)
+		for index = 1, TREES_PER_WALL do
+			local share = (index - 0.5) / TREES_PER_WALL + random:NextNumber(-0.1, 0.1)
+			drawTree(wall.From:Lerp(wall.To, share) + top, random:NextNumber(0.8, 1.1))
+		end
 	end
 end
 
 --[[
-	A patch of brush: tall alien fronds in teal and violet, and a few stalks
-	with glowing bulbs, all inside the patch's shape.
+	A patch of brush: tall fern fronds and a few reeds tipped with glowing
+	fireflies, all inside the patch's shape.
 ]]
 local function drawBrush(brush: MapLayout.BrushSpot)
 	local length = (brush.To - brush.From).Magnitude
@@ -637,7 +680,7 @@ local function drawBrushes()
 end
 
 --[[
-	An alien mushroom: a pale stalk under a wide glowing cap.
+	A giant toadstool: a pale stalk under a wide cap.
 ]]
 local function drawMushroom(base: Vector3, scale: number)
 	local height = random:NextNumber(2, 4) * scale
@@ -653,7 +696,7 @@ local function drawMushroom(base: Vector3, scale: number)
 		CFrame.new(base + Vector3.new(0, height, 0)),
 		Vector3.new(capWidth, capWidth * 0.35, capWidth),
 		cap,
-		{ Shape = "Ball", Material = Enum.Material.Neon }
+		{ Shape = "Ball", CastsShadow = true }
 	)
 end
 
@@ -699,18 +742,18 @@ local function drawRidge()
 			terrain:FillBall(center - Vector3.new(0, sink, 0), radius, Enum.Material.Rock)
 		end
 	end
-	for _ = 1, OUTSIDE_CRYSTAL_COUNT // 2 do
+	for _ = 1, RIDGE_TREE_COUNT do
 		local along = random:NextNumber(-half, half)
 		local spot = if random:NextNumber() < 0.5
 			then Vector3.new(along, 4, reach * (if random:NextNumber() < 0.5 then 1 else -1))
 			else Vector3.new(reach * (if random:NextNumber() < 0.5 then 1 else -1), 4, along)
-		drawCrystals(spot, random:NextNumber(1.2, 1.8))
+		drawTree(spot, random:NextNumber(1.3, 1.9))
 	end
 end
 
 --[[
-	The plains beyond the rim: rolling hills, crater rims, crystal spires,
-	and glowing mushrooms.
+	The forest beyond the rim: rolling hills, stone circles, dense trees, a
+	few magic crystals, and giant toadstools.
 ]]
 local function drawOutskirts()
 	local terrain = workspace.Terrain
@@ -733,6 +776,9 @@ local function drawOutskirts()
 			)
 		end
 	end
+	for _ = 1, OUTSIDE_TREE_COUNT do
+		drawTree(pickOutsideSpot(), random:NextNumber(1.6, 2.8))
+	end
 	for _ = 1, OUTSIDE_CRYSTAL_COUNT do
 		drawCrystals(pickOutsideSpot(), random:NextNumber(1.5, 2.8))
 	end
@@ -742,70 +788,52 @@ local function drawOutskirts()
 end
 
 --[[
-	A piece of the crashed mothership: a sunken hull wedge with a spine, two
-	fins, glowing seams, and a dying engine at the back. Origin sits on the
-	ground; the hull points along its -Z.
+	An old shrine ruin: a ring of stone pillars, some broken short and one
+	fallen, around a glowing rune circle. Origin sits on the ground.
 ]]
-local function drawWreck(origin: CFrame, scale: number)
-	local metal = { Material = Enum.Material.Metal, CastsShadow = true }
+local function drawRuin(origin: CFrame, scale: number)
+	local stone = { Material = Enum.Material.Cobblestone, CastsShadow = true }
 	local function place(offset: CFrame, size: Vector3, color: Color3, options: PropOptions)
 		MapClientService:DrawProp(origin * offset, size * scale, color, options)
 	end
-	local function at(x: number, y: number, z: number): CFrame
-		return CFrame.new(x * scale, y * scale, z * scale)
-	end
 
+	place(CFrame.new(0, 0.5 * scale, 0), Vector3.new(34, 1, 34), RUIN_COLOR, stone)
 	place(
-		at(0, 4, 0) * CFrame.Angles(math.rad(-8), 0, 0),
-		Vector3.new(40, 12, 70),
-		HULL_COLOR,
-		{ Shape = "Wedge", Material = Enum.Material.Metal, CastsShadow = true }
+		CFrame.new(0, 1.05 * scale, 0) * CFrame.Angles(0, 0, math.rad(90)),
+		Vector3.new(0.1, 18, 18),
+		RUNE_COLOR,
+		{ Shape = "Cylinder", Material = Enum.Material.Neon, Transparency = 0.3 }
 	)
-	place(at(0, 6, 22), Vector3.new(26, 12, 30), HULL_COLOR, metal)
+	const pillarCount = 6
+	for index = 1, pillarCount do
+		local angle = index / pillarCount * math.pi * 2
+		local height = if index % 3 == 0 then random:NextNumber(4, 7) else random:NextNumber(14, 20)
+		local spot = Vector3.new(math.cos(angle), 0, math.sin(angle)) * 14
+		place(
+			CFrame.new((spot + Vector3.new(0, 1 + height / 2, 0)) * scale),
+			Vector3.new(3, height, 3),
+			RUIN_COLOR,
+			{ Shape = "Cylinder", Material = Enum.Material.Cobblestone, CastsShadow = true }
+		)
+	end
 	place(
-		at(0, 13, 14) * CFrame.Angles(math.rad(-8), 0, 0),
-		Vector3.new(4, 4, 56),
-		HULL_COLOR,
-		metal
-	)
-	place(
-		at(-16, 9, 26) * CFrame.Angles(0, 0, math.rad(-35)),
-		Vector3.new(2, 18, 20),
-		HULL_COLOR,
-		metal
-	)
-	place(
-		at(16, 9, 26) * CFrame.Angles(0, 0, math.rad(35)),
-		Vector3.new(2, 18, 20),
-		HULL_COLOR,
-		metal
-	)
-	place(
-		at(0, 15.2, 14) * CFrame.Angles(math.rad(-8), 0, 0),
-		Vector3.new(1, 0.4, 50),
-		HULL_GLOW_COLOR,
-		NEON
-	)
-	place(at(-13.2, 12.2, 22), Vector3.new(0.4, 0.4, 28), HULL_GLOW_COLOR, NEON)
-	place(at(13.2, 12.2, 22), Vector3.new(0.4, 0.4, 28), HULL_GLOW_COLOR, NEON)
-	place(
-		at(0, 6, 37.2) * CFrame.Angles(math.rad(90), 0, 0),
-		Vector3.new(14, 1, 14),
-		HULL_GLOW_COLOR,
-		{ Shape = "Cylinder", Material = Enum.Material.Neon }
+		CFrame.new(6 * scale, 2.5 * scale, 20 * scale) * CFrame.Angles(math.rad(90), 0.4, 0),
+		Vector3.new(3, 16, 3),
+		RUIN_COLOR,
+		{ Shape = "Cylinder", Material = Enum.Material.Cobblestone, CastsShadow = true }
 	)
 end
 
-local function drawWreckage()
+local function drawRuins()
 	local half = MapLayout.HalfSize
-	-- The two corners away from the bases hold the biggest pieces; smaller
-	-- debris lies along the outer edges.
-	drawWreck(CFrame.new(-half - 70, 0, -half - 55) * CFrame.Angles(0, math.rad(40), 0), 1.2)
-	drawWreck(CFrame.new(half + 60, 0, half + 75) * CFrame.Angles(0, math.rad(-140), 0), 1.1)
-	drawWreck(CFrame.new(-half - 60, 0, 40) * CFrame.Angles(0, math.rad(100), 0), 0.55)
-	drawWreck(CFrame.new(40, 0, -half - 60) * CFrame.Angles(0, math.rad(190), 0), 0.55)
-	drawWreck(CFrame.new(half + 55, 0, -80) * CFrame.Angles(0, math.rad(-70), 0), 0.5)
-	drawWreck(CFrame.new(-80, 0, half + 55) * CFrame.Angles(0, math.rad(20), 0), 0.5)
+	-- The two corners away from the bases hold the biggest ruins; smaller
+	-- ones stand along the outer edges.
+	drawRuin(CFrame.new(-half - 70, 0, -half - 55) * CFrame.Angles(0, math.rad(40), 0), 1.2)
+	drawRuin(CFrame.new(half + 60, 0, half + 75) * CFrame.Angles(0, math.rad(-140), 0), 1.1)
+	drawRuin(CFrame.new(-half - 60, 0, 40) * CFrame.Angles(0, math.rad(100), 0), 0.55)
+	drawRuin(CFrame.new(40, 0, -half - 60) * CFrame.Angles(0, math.rad(190), 0), 0.55)
+	drawRuin(CFrame.new(half + 55, 0, -80) * CFrame.Angles(0, math.rad(-70), 0), 0.5)
+	drawRuin(CFrame.new(-80, 0, half + 55) * CFrame.Angles(0, math.rad(20), 0), 0.5)
 end
 
 function Module:Start()
@@ -820,7 +848,7 @@ function Module:Start()
 	drawBrushes()
 	drawRidge()
 	drawOutskirts()
-	drawWreckage()
+	drawRuins()
 end
 
 return Module
